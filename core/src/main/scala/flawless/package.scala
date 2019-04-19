@@ -40,7 +40,10 @@ package object flawless {
     )
   }
 
-  def loadArgs(args: List[String]): IO[TestRun] = IO.pure(TestRun(Nil, Nil))
+  def loadArgs(args: List[String]): IO[TestRun] = {
+    val _ = args
+    IO.pure(TestRun(Nil, Nil))
+  }
 
   def runTests(args: List[String])(iotest: IOTest[NonEmptyList[SuiteResult]]) =
     loadArgs(args).flatMap(iotest.run).flatMap(summarize)
@@ -51,12 +54,52 @@ package object flawless {
     val weGood = stats.suite.failed === 0
     val exit   = if (weGood) ExitCode.Success else ExitCode.Error
 
+    import scala.io.AnsiColor
+    def inGreen(s: String): String = {
+      AnsiColor.GREEN + s + AnsiColor.RESET
+    }
+
+    def inRed(s: String): String = {
+      AnsiColor.RED + s + AnsiColor.RESET
+    }
+
+    def inColor(test: TestResult): String = {
+      val successful = test.output.outcomes.forall(_.isSuccessful)
+      val testName =
+        if (successful) inGreen(show"Passed: ${test.name}")
+        else inRed(show"Failed: ${test.name}")
+
+      val failedAssertions = test.output.outcomes.toList.collect {
+        case Outcome.Failed(failure) =>
+          inRed(
+            show"${failure.text} (${failure.location})"
+          )
+      }
+
+      testName + (if (!successful) failedAssertions.mkString("\n", "\n", "\n") else "")
+    }
+
+    val successMessage = {
+      val base =
+        show"Succeeded: ${stats.test.succesful} tests (${stats.assertion.succesful} assertions)"
+      if (weGood) inGreen(base)
+      else base
+    }
+
+    val failureMessage = {
+      val base =
+        show"Failed: ${stats.test.failed} tests (${stats.assertion.failed} assertions)"
+      if (weGood) base
+      else inRed(base)
+    }
+
     val msg =
       show"""Ran ${stats.suite.total} suites, ${stats.test.total} tests, ${stats.assertion.total} assertions
-            |Succeeded: ${stats.test.succesful} tests (${stats.assertion.succesful} assertions)
-            |Failed: ${stats.test.failed} tests (${stats.assertion.failed} assertions)""".stripMargin
+            |$successMessage
+            |$failureMessage""".stripMargin
 
-    putStrLn(msg).as(exit)
+    val showSummary = putStrLn("============ TEST SUMMARY ============")
+    specs.flatMap(_.results).map(inColor).traverse(putStrLn) >> showSummary >> putStrLn(msg).as(exit)
   }
 
   object syntax {

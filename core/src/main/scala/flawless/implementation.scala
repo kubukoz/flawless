@@ -17,6 +17,9 @@ case class RunStats(
 
 object RunStats {
   case class Stat(total: Int, succesful: Int, failed: Int)
+
+  implicit val eq: Eq[RunStats]     = Eq.fromUniversalEquals
+  implicit val show: Show[RunStats] = Show.fromToString
 }
 
 case class TestRun(
@@ -24,7 +27,11 @@ case class TestRun(
   except: List[String]
 )
 
-case class AssertionFailure(text: String) extends AnyVal
+case class Location(file: String, line: Int)
+object Location {
+  implicit val show: Show[Location] = location => show"${location.file}:${location.line}"
+}
+case class AssertionFailure(text: String, location: Location)
 
 case class Output(outcomes: NonEmptyList[Outcome])
 
@@ -57,7 +64,7 @@ object SuiteResult {
     SuiteResult(a.results |+| b.results)
 }
 
-trait Suite {
+trait Suite { self =>
   def runSuite: IOTest[SuiteResult]
 }
 
@@ -82,14 +89,15 @@ class Dsl[F[_]: Functor] {
   //anyval
   implicit class ShouldBeSyntax[A](actual: A) {
 
-    def shouldBe(expected: A)(implicit eq: Eq[A], show: Show[A]): Output = {
+    def shouldBe(expected: A)(implicit eq: Eq[A], show: Show[A], file: sourcecode.File, line: sourcecode.Line): Output = {
       val outcome =
         if (eq.eqv(actual, expected))
           Outcome.Successful
         else
           Outcome.Failed(
             AssertionFailure(
-              show"""$actual (actual) wasn't equal to $expected (expected)"""
+              show"""$actual (actual) wasn't equal to $expected (expected)""",
+              Location(file.value, line.value)
             )
           )
 

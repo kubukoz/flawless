@@ -26,16 +26,22 @@ val commonSettings = Seq(
   name := "flawless",
   libraryDependencies ++= List(
     "org.typelevel"     %% "cats-effect"  % "1.2.0",
-    "com.github.gvolpe" %% "console4cats" % "0.6.0"
+    "com.github.gvolpe" %% "console4cats" % "0.6.0",
+    "com.lihaoyi"       %% "sourcecode"   % "0.1.5"
   ) ++ compilerPlugins
 )
 
 val core = project.settings(commonSettings).settings(name += "-core")
+
+val tests =
+  project
+    .settings(commonSettings)
+    .settings(name += "-tests", skip in publish := true)
+    .dependsOn(core)
 
 val flawless =
   project
     .in(file("."))
     .settings(commonSettings)
     .settings(skip in publish := true)
-    .dependsOn(core)
-    .aggregate(core)
+    .aggregate(core, tests)
