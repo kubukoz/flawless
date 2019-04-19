@@ -21,7 +21,7 @@ before_install:
 stages:
 - name: test
 - name: release
-  if: (branch = master AND type = push) OR (tag IS present)
+  if: (tag IS present)
 jobs:
   include:
   # stage="test" if no stage is specified
