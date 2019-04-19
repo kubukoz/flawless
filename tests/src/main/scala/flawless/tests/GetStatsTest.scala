@@ -11,7 +11,7 @@ object GetStatsTest extends PureSuite {
   val runSuitePure: PureTest[SuiteResult] = tests(
     test("1 test: 1s/0f") {
       val input = test("Example") {
-        (1 shouldBe 1)
+        1 shouldBe 1
       }.run(TestRun(Nil, Nil))
 
       getStats(NonEmptyList.of(input)) shouldBe RunStats(
