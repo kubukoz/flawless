@@ -28,6 +28,7 @@ case class TestRun(
 )
 
 case class Location(file: String, line: Int)
+
 object Location {
   implicit val show: Show[Location] = location => show"${location.file}:${location.line}"
 }
@@ -79,17 +80,33 @@ trait PureSuite extends Suite {
 class Dsl[F[_]: Functor] {
 
   def test(name: String)(
-    ftest: => F[Output]
+    ftest: F[Output]
   ): Kleisli[F, TestRun, SuiteResult] = Kleisli.liftF {
     ftest.map { result =>
       SuiteResult(NonEmptyList.one(TestResult(name, result)))
     }
   }
 
-  //anyval
+  /*
+   * If you like to write each test in its own line, this is a handy helper that'll make it possible.
+   * Instead of combining tests with the semigroup, pass them to this function
+   * as you would to e.g. the List(...) constructor.
+   */
+  def tests(
+    first: Kleisli[F, TestRun, SuiteResult],
+    others: Kleisli[F, TestRun, SuiteResult]*
+  )(implicit S: Semigroup[F[SuiteResult]]): Kleisli[F, TestRun, SuiteResult] =
+    NonEmptyList(first, others.toList).reduce
+
+  //anyval maybe?
   implicit class ShouldBeSyntax[A](actual: A) {
 
-    def shouldBe(expected: A)(implicit eq: Eq[A], show: Show[A], file: sourcecode.File, line: sourcecode.Line): Output = {
+    def shouldBe(expected: A)(
+      implicit eq: Eq[A],
+      show: Show[A],
+      file: sourcecode.File,
+      line: sourcecode.Line
+    ): Output = {
       val outcome =
         if (eq.eqv(actual, expected))
           Outcome.Successful
