@@ -34,8 +34,13 @@ object Output {
 
 //glorified Validated
 sealed trait Outcome extends Product with Serializable {
-  def isSuccessful: Boolean = this eq Outcome.Successful
-  def isFailed: Boolean     = this.isInstanceOf[Outcome.Failed]
+  def isSuccessful: Boolean = fold(true, _ => false)
+  def isFailed: Boolean     = !isSuccessful
+
+  def fold[A](successful: => A, failed: AssertionFailure => A): A = this match {
+    case Outcome.Successful       => successful
+    case Outcome.Failed(failures) => failed(failures)
+  }
 }
 
 object Outcome {
