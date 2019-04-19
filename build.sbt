@@ -11,12 +11,13 @@ inThisBuild(
         url("https://kubukoz.com")
       )
     )
-  ))
+  )
+)
 
 val compilerPlugins = List(
   compilerPlugin("org.scalamacros" % "paradise" % "2.1.1").cross(CrossVersion.full),
-  compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.10"),
-  compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0")
+  compilerPlugin("org.spire-math" %% "kind-projector"     % "0.9.10"),
+  compilerPlugin("com.olegpy"     %% "better-monadic-for" % "0.3.0")
 )
 
 val commonSettings = Seq(
@@ -24,7 +25,7 @@ val commonSettings = Seq(
   scalacOptions ++= Options.all,
   name := "flawless",
   libraryDependencies ++= List(
-    "org.typelevel" %% "cats-effect" % "1.2.0",
+    "org.typelevel"     %% "cats-effect"  % "1.2.0",
     "com.github.gvolpe" %% "console4cats" % "0.6.0"
   ) ++ compilerPlugins
 )
