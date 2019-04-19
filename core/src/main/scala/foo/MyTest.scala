@@ -10,34 +10,37 @@ import flawless._
 object ExampleTest extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
     val parallelTests = NonEmptyList.of(
-      FirstSpec,
-      FirstSpec
+      FirstSuite,
+      FirstSuite
     )
 
     val sequentialTests = NonEmptyList.of(
-      FirstSpec,
-      FirstSpec
+      FirstSuite
     )
 
     runTests(args)(
-      (parallelTests.parTraverse(_.runSpec) |+| sequentialTests.traverse(_.runSpec))
+      parallelTests.parTraverse(_.runSuite) |+| sequentialTests.traverse(_.runSuite)
     )
   }
 }
 
 import flawless.syntax.pure._
 
-object FirstSpec extends PureSpec {
+object FirstSuite extends PureSuite {
   val service: MyService = LiveMyService
 
-  override val runPure: PureTest[SpecResult] = {
+  override val runSuitePure: PureTest[SuiteResult] = {
     test("job(1) and (2)")(
       service.job(1).shouldBe("I got 1 problems but a test ain't one") |+|
         service.job(2).shouldBe("I got 2 problems but a test ain't one")
     ) |+|
-      test("job(3) and (4)")(
-        service.job(3).shouldBe("I got 3 problems but a test ain't one") |+|
-          service.job(4).shouldBe("I got 4 problems but a test ain't one")
+      test("job(1-1000)")(
+        //this test is pretty useless tbh, don't write tests like that
+        NonEmptyList(1, (2 to 1000).toList).reduceMap { n =>
+          val result = service.job(n)
+          result.shouldBe(show"I got $n problems but a test ain't one") |+|
+            result.contains("500").shouldBe(false)
+        }
       )
   }
 }
