@@ -16,7 +16,7 @@ case class RunStats(
 )
 
 object RunStats {
-  case class Stat(total: Int, failed: Int, succesful: Int)
+  case class Stat(total: Int, succesful: Int, failed: Int)
 }
 
 case class TestRun(
@@ -69,10 +69,10 @@ trait PureSuite extends Suite {
   }
 }
 
-final class Dsl[F[_]: Functor] {
+class Dsl[F[_]: Functor] {
 
   def test(name: String)(
-    ftest: F[Output]
+    ftest: => F[Output]
   ): Kleisli[F, TestRun, SuiteResult] = Kleisli.liftF {
     ftest.map { result =>
       SuiteResult(NonEmptyList.one(TestResult(name, result)))

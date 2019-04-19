@@ -4,12 +4,11 @@ import cats.effect.IO
 import cats.effect.ExitCode
 import cats.data.Kleisli
 import cats.data.NonEmptyList
-import cats.data.Reader
 import cats.Id
 
 package object flawless {
   type IOTest[A]   = Kleisli[IO, TestRun, A]
-  type PureTest[A] = Reader[TestRun, A]
+  type PureTest[A] = Kleisli[Id, TestRun, A]
 
   import cats.effect.Console.io._
 
@@ -44,9 +43,9 @@ package object flawless {
   def loadArgs(args: List[String]): IO[TestRun] = IO.pure(TestRun(Nil, Nil))
 
   def runTests(args: List[String])(iotest: IOTest[NonEmptyList[SuiteResult]]) =
-    loadArgs(args).flatMap(iotest.flatMap(summarize).run)
+    loadArgs(args).flatMap(iotest.run).flatMap(summarize)
 
-  def summarize(specs: NonEmptyList[SuiteResult]): IOTest[ExitCode] = {
+  def summarize(specs: NonEmptyList[SuiteResult]): IO[ExitCode] = {
 
     val stats  = getStats(specs)
     val weGood = stats.suite.failed === 0
@@ -57,11 +56,11 @@ package object flawless {
             |Succeeded: ${stats.test.succesful} tests (${stats.assertion.succesful} assertions)
             |Failed: ${stats.test.failed} tests (${stats.assertion.failed} assertions)""".stripMargin
 
-    Kleisli.liftF(putStrLn(msg).as(exit))
+    putStrLn(msg).as(exit)
   }
 
   object syntax {
-    val pure = new Dsl[Id]
-    val io   = new Dsl[IO]
+    object pure extends Dsl[Id]
+    object io   extends Dsl[IO]
   }
 }

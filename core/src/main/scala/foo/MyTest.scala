@@ -39,7 +39,6 @@ object FirstSuite extends PureSuite {
         service.job(2).shouldBe("I got 2 problems but a test ain't one")
     ) |+|
       test("job(1-1000)")(
-        //this test is pretty useless tbh, don't write tests like that
         NonEmptyList(1, (2 to 1000).toList).reduceMap { n =>
           val result = service.job(n)
           result.shouldBe(show"I got $n problems but a test ain't one") |+|
@@ -60,7 +59,6 @@ object IOSuite extends Suite {
         service.job(2).map(_.shouldBe("I got 2 problems but a test ain't one"))
     ) |+|
       test("job(1-1000)")(
-        //this test is pretty useless tbh, don't write tests like that
         NonEmptyList(1, (2 to 1000).toList).reduceMapM { n =>
           service.job(n).map { result =>
             result.shouldBe(show"I got $n problems but a test ain't one") |+|
