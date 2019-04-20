@@ -22,6 +22,7 @@ object RunStats {
   implicit val show: Show[RunStats] = Show.fromToString
 }
 
+//todo remove for now? Can be added later
 case class TestRun(
   only: List[String],
   except: List[String]
