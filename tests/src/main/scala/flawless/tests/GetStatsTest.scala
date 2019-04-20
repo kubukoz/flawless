@@ -9,7 +9,7 @@ object GetStatsTest extends PureSuite {
   import RunStats.Stat
 
   val runSuitePure: PureTest[SuiteResult] = tests(
-    test("1 test: 1s/0f") {
+    test("1 test: 1 succ / 0 fail") {
       val input = test("Example") {
         1 shouldBe 1
       }.run(TestRun(Nil, Nil))
@@ -20,7 +20,7 @@ object GetStatsTest extends PureSuite {
         Stat(1, 1, 0)
       )
     },
-    test("1 test: 1s/1f") {
+    test("1 test: 1 succ / 1 fail") {
       val input = test("Example") {
         (1 shouldBe 1) |+| (1 shouldBe 2)
       }.run(TestRun(Nil, Nil))
@@ -31,7 +31,7 @@ object GetStatsTest extends PureSuite {
         Stat(2, 1, 1)
       )
     },
-    test("1 test: 1s/2f") {
+    test("1 test: 1 succ / 2 fail") {
       val input = test("Example") {
         (1 shouldBe 1) |+| (1 shouldBe 2).combineN(2)
       }.run(TestRun(Nil, Nil))

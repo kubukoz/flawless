@@ -35,29 +35,29 @@ object Location {
 }
 case class AssertionFailure(text: String, location: Location)
 
-case class Output(outcomes: NonEmptyList[Outcome])
+case class Assertions(value: NonEmptyList[Assertion])
 
-object Output {
-  implicit val semigroup: Semigroup[Output] = (a, b) => Output(a.outcomes |+| b.outcomes)
+object Assertions {
+  implicit val semigroup: Semigroup[Assertions] = (a, b) =>
+    Assertions(a.value |+| b.value)
 }
 
-//glorified Validated
-sealed trait Outcome extends Product with Serializable {
+sealed trait Assertion extends Product with Serializable {
   def isSuccessful: Boolean = fold(true, _ => false)
   def isFailed: Boolean     = !isSuccessful
 
   def fold[A](successful: => A, failed: AssertionFailure => A): A = this match {
-    case Outcome.Successful       => successful
-    case Outcome.Failed(failures) => failed(failures)
+    case Assertion.Successful       => successful
+    case Assertion.Failed(failures) => failed(failures)
   }
 }
 
-object Outcome {
-  case object Successful                       extends Outcome
-  case class Failed(failure: AssertionFailure) extends Outcome
+object Assertion {
+  case object Successful                       extends Assertion
+  case class Failed(failure: AssertionFailure) extends Assertion
 }
 
-case class TestResult(name: String, output: Output)
+case class TestResult(name: String, assertions: Assertions)
 
 case class SuiteResult(results: NonEmptyList[TestResult])
 
@@ -81,7 +81,7 @@ trait PureSuite extends Suite {
 class Dsl[F[_]: Functor] {
 
   def test(name: String)(
-    ftest: F[Output]
+    ftest: F[Assertions]
   ): Kleisli[F, TestRun, SuiteResult] = Kleisli.liftF {
     ftest.map { result =>
       SuiteResult(NonEmptyList.one(TestResult(name, result)))
@@ -107,19 +107,19 @@ class Dsl[F[_]: Functor] {
       show: Show[A],
       file: sourcecode.File,
       line: sourcecode.Line
-    ): Output = {
-      val outcome =
+    ): Assertions = {
+      val assertion =
         if (eq.eqv(actual, expected))
-          Outcome.Successful
+          Assertion.Successful
         else
-          Outcome.Failed(
+          Assertion.Failed(
             AssertionFailure(
               show"""$actual (actual) wasn't equal to $expected (expected)""",
               Location(file.value, line.value)
             )
           )
 
-      Output(NonEmptyList.one(outcome))
+      Assertions(NonEmptyList.one(assertion))
     }
   }
 }

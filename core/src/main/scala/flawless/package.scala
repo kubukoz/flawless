@@ -15,12 +15,12 @@ package object flawless {
   def getStats(specs: NonEmptyList[SuiteResult]): RunStats = {
     val suiteCount = specs.size
     val tests      = specs.flatMap(_.results)
-    val assertions = tests.flatMap(_.output.outcomes)
+    val assertions = tests.flatMap(_.assertions.value)
 
     val (successfulSuites, failedSuites) =
-      specs.toList.partition(_.results.forall(_.output.outcomes.forall(_.isSuccessful)))
+      specs.toList.partition(_.results.forall(_.assertions.value.forall(_.isSuccessful)))
     val (successfulTests, failedTests) =
-      tests.toList.partition(_.output.outcomes.forall(_.isSuccessful))
+      tests.toList.partition(_.assertions.value.forall(_.isSuccessful))
     val (successfulAssertions, failedAssertions) =
       assertions.toList.partition(_.isSuccessful)
 
@@ -64,13 +64,13 @@ package object flawless {
     }
 
     def inColor(test: TestResult): String = {
-      val successful = test.output.outcomes.forall(_.isSuccessful)
+      val successful = test.assertions.value.forall(_.isSuccessful)
       val testName =
         if (successful) inGreen(show"Passed: ${test.name}")
         else inRed(show"Failed: ${test.name}")
 
-      val failedAssertions = test.output.outcomes.toList.collect {
-        case Outcome.Failed(failure) =>
+      val failedAssertions = test.assertions.value.toList.collect {
+        case Assertion.Failed(failure) =>
           inRed(
             show"${failure.text} (${failure.location})"
           )
@@ -99,7 +99,9 @@ package object flawless {
             |$failureMessage""".stripMargin
 
     val showSummary = putStrLn("============ TEST SUMMARY ============")
-    specs.flatMap(_.results).map(inColor).traverse(putStrLn) >> showSummary >> putStrLn(msg).as(exit)
+    specs.flatMap(_.results).map(inColor).traverse(putStrLn) >> showSummary >> putStrLn(
+      msg
+    ).as(exit)
   }
 
   object syntax {
