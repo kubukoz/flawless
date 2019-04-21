@@ -2,13 +2,12 @@ import cats.implicits._
 
 import cats.effect.IO
 import cats.effect.ExitCode
-import cats.data.Kleisli
 import cats.data.NonEmptyList
 import cats.Id
 
 package object flawless {
-  type IOTest[A]   = Kleisli[IO, TestRun, A]
-  type PureTest[A] = Kleisli[Id, TestRun, A]
+  type IOTest[A]   = IO[A]
+  type PureTest[A] = A
 
   import cats.effect.Console.io._
 
@@ -40,21 +39,21 @@ package object flawless {
     )
   }
 
-  def loadArgs(args: List[String]): IO[TestRun] = {
+  def loadArgs(args: List[String]): IO[Unit] = {
     val _ = args
-    IO.pure(TestRun(Nil, Nil))
+    IO.unit
   }
 
   def runTests(args: List[String])(iotest: IOTest[NonEmptyList[SuiteResult]]) =
-    loadArgs(args).flatMap(iotest.run).flatMap(summarize)
+    loadArgs(args) >> iotest.flatMap(summarize)
 
   def summarize(specs: NonEmptyList[SuiteResult]): IO[ExitCode] = {
+    import scala.io.AnsiColor
 
     val stats  = getStats(specs)
     val weGood = stats.suite.failed === 0
     val exit   = if (weGood) ExitCode.Success else ExitCode.Error
 
-    import scala.io.AnsiColor
     def inGreen(s: String): String = {
       AnsiColor.GREEN + s + AnsiColor.RESET
     }

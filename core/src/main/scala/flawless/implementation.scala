@@ -22,12 +22,6 @@ object RunStats {
   implicit val show: Show[RunStats] = Show.fromToString
 }
 
-//todo remove for now? Can be added later
-case class TestRun(
-  only: List[String],
-  except: List[String]
-)
-
 case class Location(file: String, line: Int)
 
 object Location {
@@ -73,8 +67,9 @@ trait Suite { self =>
 trait PureSuite extends Suite {
   def runSuitePure: PureTest[SuiteResult]
 
-  final override val runSuite: IOTest[SuiteResult] = Kleisli { config =>
-    IO(runSuitePure.run(config))
+  final override val runSuite: IOTest[SuiteResult] = {
+    //suspended for laziness (to avoid NPE)
+    IO(runSuitePure)
   }
 }
 
@@ -82,7 +77,7 @@ class Dsl[F[_]: Functor] {
 
   def test(name: String)(
     ftest: F[Assertions]
-  ): Kleisli[F, TestRun, SuiteResult] = Kleisli.liftF {
+  ): F[SuiteResult] = {
     ftest.map { result =>
       SuiteResult(NonEmptyList.one(TestResult(name, result)))
     }
@@ -94,9 +89,9 @@ class Dsl[F[_]: Functor] {
    * as you would to e.g. the List(...) constructor.
    */
   def tests(
-    first: Kleisli[F, TestRun, SuiteResult],
-    others: Kleisli[F, TestRun, SuiteResult]*
-  )(implicit S: Semigroup[F[SuiteResult]]): Kleisli[F, TestRun, SuiteResult] =
+    first: F[SuiteResult],
+    others: F[SuiteResult]*
+  )(implicit S: Semigroup[F[SuiteResult]]): F[SuiteResult] =
     NonEmptyList(first, others.toList).reduce
 
   //anyval maybe?
@@ -114,7 +109,7 @@ class Dsl[F[_]: Functor] {
         else
           Assertion.Failed(
             AssertionFailure(
-              show"""$actual (actual) wasn't equal to $expected (expected)""",
+              show"""Reason: $actual (actual) wasn't equal to $expected (expected)""",
               Location(file.value, line.value)
             )
           )

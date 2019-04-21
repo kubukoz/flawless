@@ -12,7 +12,7 @@ object GetStatsTest extends PureSuite {
     test("1 test: 1 succ / 0 fail") {
       val input = test("Example") {
         1 shouldBe 1
-      }.run(TestRun(Nil, Nil))
+      }
 
       getStats(NonEmptyList.of(input)) shouldBe RunStats(
         Stat(1, 1, 0),
@@ -23,7 +23,7 @@ object GetStatsTest extends PureSuite {
     test("1 test: 1 succ / 1 fail") {
       val input = test("Example") {
         (1 shouldBe 1) |+| (1 shouldBe 2)
-      }.run(TestRun(Nil, Nil))
+      }
 
       getStats(NonEmptyList.of(input)) shouldBe RunStats(
         Stat(1, 0, 1),
@@ -34,7 +34,7 @@ object GetStatsTest extends PureSuite {
     test("1 test: 1 succ / 2 fail") {
       val input = test("Example") {
         (1 shouldBe 1) |+| (1 shouldBe 2).combineN(2)
-      }.run(TestRun(Nil, Nil))
+      }
 
       getStats(NonEmptyList.of(input)) shouldBe RunStats(
         Stat(1, 0, 1),
