@@ -5,7 +5,6 @@ import cats.kernel.Eq
 import cats.effect.IO
 import cats.implicits._
 import cats.data.NonEmptyList
-import cats.data.Kleisli
 import cats.kernel.Semigroup
 import cats.Functor
 
@@ -27,6 +26,7 @@ case class Location(file: String, line: Int)
 object Location {
   implicit val show: Show[Location] = location => show"${location.file}:${location.line}"
 }
+
 case class AssertionFailure(text: String, location: Location)
 
 case class Assertions(value: NonEmptyList[Assertion])
@@ -53,7 +53,7 @@ object Assertion {
 
 case class TestResult(name: String, assertions: Assertions)
 
-case class SuiteResult(results: NonEmptyList[TestResult])
+case class SuiteResult(results: NonEmptyList[TestResult]) extends AnyVal
 
 object SuiteResult {
   implicit val semigroup: Semigroup[SuiteResult] = (a, b) =>
