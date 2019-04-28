@@ -28,12 +28,12 @@ object ExampleTest extends IOApp {
   }
 }
 
-object FirstSuite extends PureSuite {
+object FirstSuite extends Suite {
   val service: MyService[Id] = new MyServiceImpl
 
   import flawless.syntax.pure._
 
-  override val runSuitePure: PureTest[SuiteResult] = {
+  override val runSuite: IOTest[SuiteResult] = IO {
     test("job(1) and (2)")(
       service.job(1).shouldBe("I got 1 problems but a test ain't one") |+|
         service.job(2).shouldBe("I got 2 problems but a test ain't one")
@@ -49,6 +49,7 @@ object FirstSuite extends PureSuite {
 }
 
 object IOSuite extends Suite {
+
   val service: MyService[IO] = new MyServiceImpl[IO]
 
   import flawless.syntax.io._
@@ -74,6 +75,7 @@ trait MyService[F[_]] {
 }
 
 class MyServiceImpl[F[_]: Applicative] extends MyService[F] {
+
   override def job(i: Int): F[String] =
     ("I got " + i + " problems but a test ain't one").pure[F]
 }

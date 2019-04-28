@@ -6,8 +6,7 @@ import cats.data.NonEmptyList
 import cats.Id
 
 package object flawless {
-  type IOTest[A]   = IO[A]
-  type PureTest[A] = A
+  type IOTest[A] = IO[A]
 
   import cats.effect.Console.io._
 

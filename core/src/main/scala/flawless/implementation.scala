@@ -2,7 +2,6 @@ package flawless
 
 import cats.Show
 import cats.kernel.Eq
-import cats.effect.IO
 import cats.implicits._
 import cats.data.NonEmptyList
 import cats.kernel.Semigroup
@@ -62,15 +61,6 @@ object SuiteResult {
 
 trait Suite { self =>
   def runSuite: IOTest[SuiteResult]
-}
-
-trait PureSuite extends Suite {
-  def runSuitePure: PureTest[SuiteResult]
-
-  final override val runSuite: IOTest[SuiteResult] = {
-    //suspended for laziness (to avoid NPE)
-    IO(runSuitePure)
-  }
 }
 
 class Dsl[F[_]: Functor] {
