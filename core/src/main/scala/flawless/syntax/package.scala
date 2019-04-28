@@ -1,4 +1,5 @@
 package flawless
+
 import cats.Id
 import cats.effect.IO
 

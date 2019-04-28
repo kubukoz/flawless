@@ -13,14 +13,40 @@ import cats.Show
 import flawless.Assertion
 import flawless.AssertionFailure
 import flawless.stats.Location
+import cats.NonEmptyParallel
+import cats.Id
+import cats.FlatMap
+import cats.effect.Clock
+import java.util.concurrent.TimeUnit
+import flawless.SuiteMetadata
 
-class Dsl[F[_]: Functor] {
+trait TestCompiler[F[_]] {
+  def compile[A](fa: F[SuiteResult]): F[SuiteResult]
+}
+
+object TestCompiler {
+  implicit val idTestCompiler: TestCompiler[Id] = new TestCompiler[Id] {
+    def compile[A](fa: SuiteResult): SuiteResult = fa
+  }
+
+  implicit def timedTestCompiler[F[_]: Clock: FlatMap]: TestCompiler[F] = new TestCompiler[F] {
+    val now = Clock[F].monotonic(TimeUnit.MILLISECONDS)
+
+    def compile[A](fa: F[SuiteResult]): F[SuiteResult] = for {
+      before <- now
+      result <- fa
+      after <- now
+    } yield result.copy(meta = Some(SuiteMetadata(before, after)))
+  }
+}
+
+class Dsl[F[_]: Functor] extends ExtraParallelSyntax {
 
   def test(name: String)(
     ftest: F[Assertions]
-  ): F[SuiteResult] = {
+  )(implicit compiler: TestCompiler[F]): F[SuiteResult] = compiler.compile {
     ftest.map { result =>
-      SuiteResult(NonEmptyList.one(TestResult(name, result)))
+      SuiteResult(None, NonEmptyList.one(TestResult(name, result)))
     }
   }
 
@@ -56,6 +82,17 @@ class Dsl[F[_]: Functor] {
           )
 
       Assertions(NonEmptyList.one(assertion))
+    }
+  }
+}
+
+trait ExtraParallelSyntax {
+  implicit class ParallelCombineOps[F[_], A](fa: F[A]) {
+
+    def |&|[M[_]](
+      another: F[A]
+    )(implicit S: Semigroup[A], P: NonEmptyParallel[F, M]): F[A] = {
+      P.sequential(P.apply.map2(P.parallel(fa), P.parallel(another))(S.combine))
     }
   }
 }

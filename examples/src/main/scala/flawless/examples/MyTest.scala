@@ -8,18 +8,19 @@ import cats.data.NonEmptyList
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._
 import flawless._
+import cats.NonEmptyParallel
 
 object ExampleTest extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
     val parallelTests = NonEmptyList.of(
       FirstSuite,
       FirstSuite,
-      IOSuite
+      new IOSuite
     )
 
     val sequentialTests = NonEmptyList.of(
       FirstSuite,
-      IOSuite
+      new IOSuite
     )
 
     runTests(args)(
@@ -48,7 +49,7 @@ object FirstSuite extends Suite {
   }
 }
 
-object IOSuite extends Suite {
+class IOSuite[G[_]](implicit nep: NonEmptyParallel[IO, G]) extends Suite {
 
   val service: MyService[IO] = new MyServiceImpl[IO]
 
@@ -58,7 +59,7 @@ object IOSuite extends Suite {
     test("job(1) and (2)")(
       service.job(1).map(_.shouldBe("I got 1 problems but a test ain't one")) |+|
         service.job(2).map(_.shouldBe("I got 2 problems but a test ain't one"))
-    ) |+|
+    ) |&|
       test("job(1-1000)")(
         NonEmptyList(1, (2 to 1000).toList).reduceMapM { n =>
           service.job(n).map { result =>

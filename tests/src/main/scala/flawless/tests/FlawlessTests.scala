@@ -11,7 +11,7 @@ object FlawlessTests extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] = runTests(args) {
     val parallelTests = NonEmptyList.of(
-      GetStatsTest
+      RunStatsTests
     )
 
     parallelTests.parTraverse(_.runSuite)

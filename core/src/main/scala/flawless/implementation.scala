@@ -4,6 +4,7 @@ import cats.implicits._
 import cats.data.NonEmptyList
 import cats.kernel.Semigroup
 import flawless.stats.Location
+import scala.concurrent.duration.FiniteDuration
 
 case class AssertionFailure(text: String, location: Location)
 
@@ -31,11 +32,18 @@ object Assertion {
 
 case class TestResult(name: String, assertions: Assertions)
 
-case class SuiteResult(results: NonEmptyList[TestResult]) extends AnyVal
+case class SuiteMetadata(timeStart: Long, timeEnd: Long)
+
+object SuiteMetadata {
+  implicit val semigroup: Semigroup[SuiteMetadata] = (a, b) =>
+    SuiteMetadata(a.timeStart min b.timeStart, a.timeEnd max b.timeEnd)
+}
+
+case class SuiteResult(meta: Option[SuiteMetadata], results: NonEmptyList[TestResult])
 
 object SuiteResult {
   implicit val semigroup: Semigroup[SuiteResult] = (a, b) =>
-    SuiteResult(a.results |+| b.results)
+    SuiteResult(a.meta |+| b.meta, a.results |+| b.results)
 }
 
 trait Suite { self =>

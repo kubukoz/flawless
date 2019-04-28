@@ -6,7 +6,7 @@ import flawless.stats._
 import cats.implicits._
 import cats.effect.IO
 
-object GetStatsTest extends Suite {
+object RunStatsTests extends Suite {
   import RunStats.Stat
   import flawless.syntax.pure._
 
