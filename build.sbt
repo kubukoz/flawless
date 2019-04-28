@@ -39,9 +39,15 @@ val tests =
     .settings(name += "-tests", skip in publish := true)
     .dependsOn(core)
 
+val examples =
+  project
+    .settings(commonSettings)
+    .settings(name += "-tests", skip in publish := true)
+    .dependsOn(core)
+
 val flawless =
   project
     .in(file("."))
     .settings(commonSettings)
     .settings(skip in publish := true)
-    .aggregate(core, tests)
+    .aggregate(core, examples, tests)
