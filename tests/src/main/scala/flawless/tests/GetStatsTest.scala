@@ -2,6 +2,7 @@ package flawless.tests
 
 import cats.data.NonEmptyList
 import flawless._
+import flawless.stats._
 import cats.implicits._
 import cats.effect.IO
 
@@ -17,7 +18,7 @@ object GetStatsTest extends Suite {
           (1 shouldBe 1)
         }
 
-        getStats(NonEmptyList.one(input)) shouldBe RunStats(
+        RunStats.fromSuites(NonEmptyList.one(input)) shouldBe RunStats(
           Stat(1, 1, 0),
           Stat(1, 1, 0),
           Stat(1, 1, 0)
@@ -28,7 +29,7 @@ object GetStatsTest extends Suite {
           (1 shouldBe 1) |+| (1 shouldBe 2)
         }
 
-        getStats(NonEmptyList.of(input)) shouldBe RunStats(
+        RunStats.fromSuites(NonEmptyList.of(input)) shouldBe RunStats(
           Stat(1, 0, 1),
           Stat(1, 0, 1),
           Stat(2, 1, 1)
@@ -39,7 +40,7 @@ object GetStatsTest extends Suite {
           (1 shouldBe 1) |+| (1 shouldBe 2).combineN(2)
         }
 
-        getStats(NonEmptyList.of(input)) shouldBe RunStats(
+        RunStats.fromSuites(NonEmptyList.of(input)) shouldBe RunStats(
           Stat(1, 0, 1),
           Stat(1, 0, 1),
           Stat(3, 1, 2)

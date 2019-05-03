@@ -1,10 +1,11 @@
 package flawless.stats
 
-import cats.Eq
-import cats.Show
+import cats.{Alternative, Eq, Foldable, Show}
 import cats.implicits._
 import cats.data.NonEmptyList
-import flawless.SuiteResult
+import flawless.{Assertion, SuiteResult, TestResult}
+import monocle.{Lens, Traversal}
+import monocle.macros.GenLens
 
 case class RunStats(
   suite: RunStats.Stat,
@@ -14,32 +15,72 @@ case class RunStats(
 
 object RunStats {
 
-  def fromSpecs(specs: NonEmptyList[SuiteResult]): RunStats = {
-    val suiteCount = specs.size
-    val tests      = specs.flatMap(_.results)
-    val assertions = tests.flatMap(_.assertions.value)
+  def fromSuites(suites: NonEmptyList[SuiteResult]): RunStats = {
+    val getStatsFun = getStats(suites.toList)
 
-    val (successfulSuites, failedSuites) =
-      specs.toList.partition(_.results.forall(_.assertions.value.forall(_.isSuccessful)))
-    val (successfulTests, failedTests) =
-      tests.toList.partition(_.assertions.value.forall(_.isSuccessful))
-    val (successfulAssertions, failedAssertions) =
-      assertions.toList.partition(_.isSuccessful)
-
-    val successfulSuiteCount = successfulSuites.size
-    val failedSuiteCount     = failedSuites.size
-    val testCount            = tests.size
-    val successfulTestCount  = successfulTests.size
-    val failedTestCount      = failedTests.size
-    val assertionCount       = assertions.size
-    val successCount         = successfulAssertions.size
-    val failureCount         = failedAssertions.size
+    val suiteStat     = getStatsFun(Traversal.id)(optics.suiteToAssertions)
+    val testStat      = getStatsFun(optics.suiteToTests)(optics.testToAssertions)
+    val assertionStat = getStatsFun(optics.suiteToAssertions)(Traversal.id)
 
     RunStats(
-      suite = RunStats.Stat(suiteCount, successfulSuiteCount, failedSuiteCount),
-      test = RunStats.Stat(testCount, successfulTestCount, failedTestCount),
-      assertion = RunStats.Stat(assertionCount, successCount, failureCount)
+      suite = suiteStat,
+      test = testStat,
+      assertion = assertionStat
     )
+  }
+
+  //Lenses/traversals for suite/test/assertion results
+  private object optics {
+    private val suiteTests: Lens[SuiteResult, NonEmptyList[TestResult]] =
+      GenLens[SuiteResult](_.results)
+
+    private val testAssertions: Lens[TestResult, NonEmptyList[Assertion]] =
+      GenLens[TestResult](_.assertions.value)
+
+    val suiteToTests: Traversal[SuiteResult, TestResult] =
+      suiteTests.composeTraversal(Traversal.fromTraverse)
+
+    val testToAssertions: Traversal[TestResult, Assertion] =
+      testAssertions.composeTraversal(Traversal.fromTraverse)
+
+    val suiteToAssertions
+      : Traversal[SuiteResult, Assertion] = optics.suiteToTests >>> optics.testToAssertions
+  }
+
+  /**
+    * For each element `a` in `fa`, partition all the selected elements found in `a` by the given predicate.
+    *
+    * @param fa the root container (always the same on the same tree)
+    * @param select the way to select all the elements you want to end up in the list
+    * @param p the predicate that checks the elements
+    * @return (matching, nonmatching)
+    */
+  private def partitionByAll[F[_]: Foldable, Root, Selected](
+    fa: F[Root]
+  )(
+    select: Traversal[Root, Selected]
+  )(p: Selected => Boolean): (List[Selected], List[Selected]) = {
+    fa.foldMap(select.getAll(_).partition(p))
+  }
+
+  private def getStats[F[_]: Foldable: Alternative](
+    fa: F[SuiteResult]
+  ) = new {
+
+    /**
+      * Get the stats for the selected metric (as defined by the `select` traversal) of all the suites in `fa`.
+      * `traversal` defines how to go from the selected metric to the assertions.
+      * */
+    def apply[Selected](
+      select: Traversal[SuiteResult, Selected]
+    )(traversal: Traversal[Selected, Assertion]): RunStats.Stat = {
+      val (succeeded, failed) = partitionByAll(fa)(select)(traversal.all(_.isSuccessful))
+
+      val successCount = succeeded.size
+      val failureCount = failed.size
+
+      RunStats.Stat(failureCount + successCount, successCount, failureCount)
+    }
   }
 
   case class Stat(total: Int, successful: Int, failed: Int)

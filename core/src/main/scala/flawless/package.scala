@@ -21,7 +21,7 @@ package object flawless {
   def summarize(specs: NonEmptyList[SuiteResult]): IO[ExitCode] = {
     import scala.io.AnsiColor
 
-    val stats = RunStats.fromSpecs(specs)
+    val stats = RunStats.fromSuites(specs)
 
     val weGood = stats.suite.failed === 0
     val exit   = if (weGood) ExitCode.Success else ExitCode.Error
