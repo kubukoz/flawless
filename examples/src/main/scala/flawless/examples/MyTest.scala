@@ -9,6 +9,7 @@ import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._
 import flawless._
 import cats.NonEmptyParallel
+import flawless.syntax.TestCompiler
 
 object ExampleTest extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
@@ -49,7 +50,7 @@ object FirstSuite extends Suite {
   }
 }
 
-class IOSuite[G[_]](implicit nep: NonEmptyParallel[IO, G]) extends Suite {
+class IOSuite[G[_]](implicit nep: NonEmptyParallel[IO, G], compiler: TestCompiler[IO]) extends Suite {
 
   val service: MyService[IO] = new MyServiceImpl[IO]
 
