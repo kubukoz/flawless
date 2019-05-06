@@ -42,7 +42,10 @@ val tests =
 
 val examples =
   project
-    .settings(commonSettings)
+    .settings(commonSettings, libraryDependencies ++= List(
+      "org.tpolecat" %% "doobie-core" % "0.6.0",
+      "org.postgresql" % "postgresql" % "42.2.5"
+    ))
     .settings(name += "-tests", skip in publish := true)
     .dependsOn(core)
 

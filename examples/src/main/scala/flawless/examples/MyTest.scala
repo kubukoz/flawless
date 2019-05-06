@@ -8,6 +8,8 @@ import cats.data.NonEmptyList
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._
 import flawless._
+import doobie.Transactor
+import flawless.examples.doobie.DoobieQueryTests
 
 object ExampleTest extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
@@ -22,8 +24,18 @@ object ExampleTest extends IOApp {
       IOSuite
     )
 
+    val dbTests = {
+      val xa = Transactor.fromDriverManager[IO](
+        "org.postgresql.Driver",
+        "jdbc:postgresql://localhost:5432/postgres",
+        "postgres",
+        "postgres"
+      )
+      NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(xa)))
+    }
+
     runTests(args)(
-      parallelTests.parTraverse(_.runSuite) |+| sequentialTests.traverse(_.runSuite)
+      parallelTests.parTraverse(_.runSuite) |+| sequentialTests.traverse(_.runSuite) |+| dbTests.parTraverse(_.runSuite)
     )
   }
 }
