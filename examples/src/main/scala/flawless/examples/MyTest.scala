@@ -8,10 +8,30 @@ import cats.data.NonEmptyList
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._
 import flawless._
-import doobie.Transactor
-import flawless.examples.doobie.DoobieQueryTests
+import cats.Eval
+import cats.effect.Console.io._
+import scala.util.Random
 
 object ExampleTest extends IOApp {
+
+  def runUntilFailed(test: IOTest[SuiteResult]): IOTest[SuiteResult] = {
+    def go(successes: Long): IOTest[SuiteResult] = {
+      test.flatMap {
+        case suite if suite.results.forall(_.assertions.value.forall(_.isSuccessful)) =>
+          go(successes + 1L)
+        case failure => {
+          val showSuccesses =
+            if (successes > 0) putStrLn(show"Suite failed after $successes successes")
+            else IO.unit
+
+          showSuccesses.as(failure)
+        }
+      }
+    }
+
+    go(0L)
+  }
+
   override def run(args: List[String]): IO[ExitCode] = {
     val parallelTests = NonEmptyList.of(
       FirstSuite,
@@ -24,18 +44,67 @@ object ExampleTest extends IOApp {
       IOSuite
     )
 
-    val dbTests = {
-      val xa = Transactor.fromDriverManager[IO](
-        "org.postgresql.Driver",
-        "jdbc:postgresql://localhost:5432/postgres",
-        "postgres",
-        "postgres"
-      )
-      NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(xa)))
-    }
+    // val dbTests = {
+    //   val xa = Transactor.fromDriverManager[IO](
+    //     "org.postgresql.Driver",
+    //     "jdbc:postgresql://localhost:5432/postgres",
+    //     "postgres",
+    //     "postgres"
+    //   )
+    //   NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(xa)))
+    // }
 
     runTests(args)(
-      parallelTests.parTraverse(_.runSuite) |+| sequentialTests.traverse(_.runSuite) |+| dbTests.parTraverse(_.runSuite)
+      runUntilFailed(FlakySuite.runSuite).map(NonEmptyList.one) |+|
+        NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).parTraverse(_.runSuite) |+| parallelTests
+        .parTraverse(
+          _.runSuite
+        ) |+| sequentialTests.traverse(_.runSuite) /*  |+| dbTests.parTraverse(_.runSuite) */
+    )
+  }
+}
+
+object FlakySuite extends Suite {
+  import flawless.syntax.io._
+  private val flaky = IO(Random.nextInt(10000)).map(_ =!= 0)
+
+  val runSuite: IOTest[SuiteResult] = test("random(10000) =!= 0") {
+    flaky.map(_ shouldBe true)
+  }
+}
+
+object ExpensiveSuite extends Suite {
+  import flawless.syntax.eval._
+
+  private def fib(n: Long): Long = {
+    def go(a: Long, b: Long, n: Long): Long = {
+      if (n > 0)
+        go(b, a + b, n - 1)
+      else b
+    }
+
+    go(1, 1, n - 2)
+  }
+
+  val runSuite: IOTest[SuiteResult] = IO.eval {
+    tests(
+      test("fib(1-8)") {
+        NonEmptyList
+          .of(
+            1L -> 1L,
+            2L -> 1L,
+            3L -> 2L,
+            4L -> 3L,
+            5L -> 5L,
+            6L -> 8L
+          )
+          .reduceMap {
+            case (x, y) => Eval.later(fib(x)).map(_ shouldBe y)
+          }
+      },
+      test("fib(Int.MaxValue)") {
+        Eval.later(fib(Int.MaxValue.toLong)).map(_ shouldBe 6798988702295324957L)
+      }
     )
   }
 }
