@@ -19,6 +19,7 @@
 - Future: extensibility
   - handle tests as values ✅, inspect them ❌
   - maybe add retries, timeouts, fallbacks on assertions from the outside...
+  - plugins as wrappers over tests, e.g. flaky test finding etc...
 
 - Configuration through command-line parameters (?) or config files
   - only

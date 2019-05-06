@@ -10,8 +10,7 @@ case class AssertionFailure(text: String, location: Location)
 case class Assertions(value: NonEmptyList[Assertion])
 
 object Assertions {
-  implicit val semigroup: Semigroup[Assertions] = (a, b) =>
-    Assertions(a.value |+| b.value)
+  implicit val semigroup: Semigroup[Assertions] = (a, b) => Assertions(a.value |+| b.value)
 }
 
 sealed trait Assertion extends Product with Serializable {
@@ -34,8 +33,7 @@ case class TestResult(name: String, assertions: Assertions)
 case class SuiteResult(results: NonEmptyList[TestResult]) extends AnyVal
 
 object SuiteResult {
-  implicit val semigroup: Semigroup[SuiteResult] = (a, b) =>
-    SuiteResult(a.results |+| b.results)
+  implicit val semigroup: Semigroup[SuiteResult] = (a, b) => SuiteResult(a.results |+| b.results)
 }
 
 trait Suite { self =>
