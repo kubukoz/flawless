@@ -11,25 +11,26 @@ import flawless._
 import cats.Eval
 import cats.effect.Console.io._
 import scala.util.Random
+import flawless.examples.doobie.DoobieQueryTests
+import doobie.Transactor
 
 object ExampleTest extends IOApp {
 
+  //flaky test detector
   def runUntilFailed(test: IOTest[SuiteResult]): IOTest[SuiteResult] = {
-    def go(successes: Long): IOTest[SuiteResult] = {
-      test.flatMap {
-        case suite if suite.results.forall(_.assertions.value.forall(_.isSuccessful)) =>
-          go(successes + 1L)
-        case failure => {
-          val showSuccesses =
-            if (successes > 0) putStrLn(show"Suite failed after $successes successes")
-            else IO.unit
-
-          showSuccesses.as(failure)
-        }
+    fs2.Stream
+      .repeatEval(test)
+      .zipWithIndex
+      .dropWhile {
+        case (suite, _) => suite.results.forall(_.assertions.value.forall(_.isSuccessful))
       }
-    }
-
-    go(0L)
+      .head
+      .evalMap {
+        case (failure, successes) =>
+        putStrLn(show"Suite failed after ${successes + 1} successes").as(failure)
+      }
+      .compile
+      .lastOrError
   }
 
   override def run(args: List[String]): IO[ExitCode] = {
@@ -44,22 +45,22 @@ object ExampleTest extends IOApp {
       IOSuite
     )
 
-    // val dbTests = {
-    //   val xa = Transactor.fromDriverManager[IO](
-    //     "org.postgresql.Driver",
-    //     "jdbc:postgresql://localhost:5432/postgres",
-    //     "postgres",
-    //     "postgres"
-    //   )
-    //   NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(xa)))
-    // }
+    val dbTests = {
+      val xa = Transactor.fromDriverManager[IO](
+        "org.postgresql.Driver",
+        "jdbc:postgresql://localhost:5432/postgres",
+        "postgres",
+        "postgres"
+      )
+      NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(xa)))
+    }
 
     runTests(args)(
       runUntilFailed(FlakySuite.runSuite).map(NonEmptyList.one) |+|
         NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).parTraverse(_.runSuite) |+| parallelTests
         .parTraverse(
           _.runSuite
-        ) |+| sequentialTests.traverse(_.runSuite) /*  |+| dbTests.parTraverse(_.runSuite) */
+        ) |+| sequentialTests.traverse(_.runSuite) |+| dbTests.parTraverse(_.runSuite)
     )
   }
 }
