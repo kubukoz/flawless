@@ -27,7 +27,7 @@ object ExampleTest extends IOApp {
       .head
       .evalMap {
         case (failure, successes) =>
-        putStrLn(show"Suite failed after ${successes + 1} successes").as(failure)
+          putStrLn(show"Suite failed after ${successes + 1} successes").as(failure)
       }
       .compile
       .lastOrError
