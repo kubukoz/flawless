@@ -9,7 +9,8 @@ import flawless._
 import cats.effect.Console.io._
 
 import flawless.examples.doobie.DoobieQueryTests
-import _root_.doobie.Transactor
+import _root_.doobie.util.ExecutionContexts
+import _root_.doobie.hikari.HikariTransactor
 
 object ExampleTests extends IOApp {
 
@@ -43,13 +44,18 @@ object ExampleTests extends IOApp {
     )
 
     val dbTests = {
-      val xa = Transactor.fromDriverManager[IO](
-        "org.postgresql.Driver",
-        "jdbc:postgresql://localhost:5432/postgres",
-        "postgres",
-        "postgres"
-      )
-      NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(xa)))
+      for {
+        connectEc  <- ExecutionContexts.fixedThreadPool[IO](10)
+        transactEc <- ExecutionContexts.cachedThreadPool[IO]
+        transactor <- HikariTransactor.newHikariTransactor[IO](
+          "org.postgresql.Driver",
+          "jdbc:postgresql://localhost:5432/postgres",
+          "postgres",
+          "postgres",
+          connectEc,
+          transactEc
+        )
+      } yield NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor)))
     }
 
     runTests(args)(
@@ -57,7 +63,7 @@ object ExampleTests extends IOApp {
         NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).parTraverse(_.runSuite) |+| parallelTests
         .parTraverse(
           _.runSuite
-        ) |+| sequentialTests.traverse(_.runSuite) |+| dbTests.parTraverse(_.runSuite)
+        ) |+| sequentialTests.traverse(_.runSuite) |+| dbTests.use(_.parTraverse(_.runSuite))
     )
   }
 }
