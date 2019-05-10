@@ -16,11 +16,11 @@ case class RunStats(
 object RunStats {
 
   def fromSuites(suites: NonEmptyList[SuiteResult]): RunStats = {
-    val stats = getStats(suites.toList)
+    val stats = getStat(suites.toList)
 
-    val suiteStat     = stats.of(Traversal.id)(optics.suiteToAssertions)
-    val testStat      = stats.of(optics.suiteToTests)(optics.testToAssertions)
-    val assertionStat = stats.of(optics.suiteToAssertions)(Traversal.id)
+    val suiteStat     = stats.of(Traversal.id, optics.suiteToAssertions)
+    val testStat      = stats.of(optics.suiteToTests, optics.testToAssertions)
+    val assertionStat = stats.of(optics.suiteToAssertions, Traversal.id)
 
     RunStats(
       suite = suiteStat,
@@ -43,7 +43,8 @@ object RunStats {
     val testToAssertions: Traversal[TestResult, Assertion] =
       testAssertions.composeTraversal(Traversal.fromTraverse)
 
-    val suiteToAssertions: Traversal[SuiteResult, Assertion] = optics.suiteToTests >>> optics.testToAssertions
+    val suiteToAssertions
+      : Traversal[SuiteResult, Assertion] = optics.suiteToTests >>> optics.testToAssertions
   }
 
   /**
@@ -54,7 +55,7 @@ object RunStats {
     * @param p the predicate that checks the elements
     * @return (matching, nonmatching)
     */
-  private def partitionByAll[F[_]: Foldable, Root, Selected](
+  private def partitionAll[F[_]: Foldable, Root, Selected](
     fa: F[Root]
   )(
     select: Traversal[Root, Selected]
@@ -62,20 +63,24 @@ object RunStats {
     fa.foldMap(select.getAll(_).partition(p))
   }
 
-  private def getStats[F[_]: Foldable](
+  private def getStat[F[_]: Foldable](
     suites: F[SuiteResult]
   ) = new GetStatsPartiallyApplied(suites)
 
-  class GetStatsPartiallyApplied[F[_]: Foldable] private[RunStats] (suites: F[SuiteResult]) {
+  class GetStatsPartiallyApplied[F[_]: Foldable] private[RunStats] (
+    suites: F[SuiteResult]
+  ) {
 
     /**
       * Get the stats for the selected metric (as defined by the `select` traversal) of all the suites in `fa`.
       * `traversal` defines how to go from the selected metric to the assertions.
       * */
     def of[Selected](
-      select: Traversal[SuiteResult, Selected]
-    )(traversal: Traversal[Selected, Assertion]): RunStats.Stat = {
-      val (succeeded, failed) = partitionByAll(suites)(select)(traversal.all(_.isSuccessful))
+      select: Traversal[SuiteResult, Selected],
+      traversal: Traversal[Selected, Assertion]
+    ): RunStats.Stat = {
+      val (succeeded, failed) =
+        partitionAll(suites)(select)(traversal.all(_.isSuccessful))
 
       val successCount = succeeded.size
       val failureCount = failed.size
