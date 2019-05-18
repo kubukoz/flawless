@@ -12,7 +12,7 @@ package object syntax {
 
   def test[A, F[_]](name: String)(
     ftest: A
-  )(implicit structure: Structure[A, F], functor: Functor[F]): F[SuiteResult] = {
+  )(implicit structure: Structure[A, F, Assertions], functor: Functor[F]): F[SuiteResult] = {
     structure.convert(ftest).map { result =>
       SuiteResult(NonEmptyList.one(TestResult(name, result)))
     }
