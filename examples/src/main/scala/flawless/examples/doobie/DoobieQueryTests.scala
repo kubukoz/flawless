@@ -12,7 +12,7 @@ class DoobieQueryTests(xa: Transactor[IO]) extends Suite {
 
   val runSuite: IOTest[SuiteResult] = {
     import doobie.implicits._
-    
+
     test("select 1") {
       sql"select 1".query[Int].to[List].transact(xa).map(_ shouldBe List(1))
     }

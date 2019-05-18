@@ -25,8 +25,8 @@ abstract class Structure[A, F[_], B] {
 }
 
 object Structure {
-  implicit def idStructure[A, B](implicit ev: A =:= B): Structure[A, Id, B] =
-    fStructure[Id, A, B]
+  implicit def idStructure[A]: Structure[A, Id, A] =
+    fStructure[Id, A, A]
 
   implicit def fStructure[F[_], A, B](implicit ev: A =:= F[B]): Structure[A, F, B] =
     new Structure[A, F, B] {
