@@ -19,13 +19,12 @@ object ExampleTests extends IOApp {
     fs2.Stream
       .repeatEval(test)
       .zipWithIndex
-      .dropWhile {
-        case (suite, _) => suite.results.forall(_.assertions.value.forall(_.isSuccessful))
+      .find {
+        case (suite, _) => suite.results.exists(_.assertions.value.exists(_.isFailed))
       }
-      .head
       .evalMap {
-        case (failure, successes) =>
-          putStrLn(show"Suite failed after ${successes + 1} successes").as(failure)
+        case (failure, failureIndex) =>
+          putStrLn(show"Suite failed after ${failureIndex + 1} successes").as(failure)
       }
       .compile
       .lastOrError
@@ -60,10 +59,13 @@ object ExampleTests extends IOApp {
 
     runTests(args)(
       runUntilFailed(FlakySuite.runSuite).map(NonEmptyList.one) |+|
-        NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).parTraverse(_.runSuite) |+| parallelTests
-        .parTraverse(
-          _.runSuite
-        ) |+| sequentialTests.traverse(_.runSuite) |+| dbTests.use(_.parTraverse(_.runSuite))
+        NonEmptyList
+          .fromListUnsafe(List.fill(10)(ExpensiveSuite))
+          .parTraverse(_.runSuite) |+| parallelTests.parTraverse(
+        _.runSuite
+      ) |+| sequentialTests.traverse(_.runSuite) |+| dbTests.use(
+        _.parTraverse(_.runSuite)
+      )
     )
   }
 }

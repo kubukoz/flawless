@@ -8,7 +8,7 @@ import cats.effect.IO
 
 object GetStatsTest extends Suite {
   import RunStats.Stat
-  import flawless.syntax.pure._
+  import flawless.syntax._
 
   val runSuite: IOTest[SuiteResult] = IO {
     tests(

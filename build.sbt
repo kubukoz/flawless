@@ -35,17 +35,26 @@ val commonSettings = Seq(
 val core = project.settings(commonSettings).settings(name += "-core")
 
 val tests =
-  project.settings(commonSettings).settings(name += "-tests", skip in publish := true).dependsOn(core)
+  project
+    .settings(commonSettings)
+    .settings(name += "-tests", skip in publish := true)
+    .dependsOn(core)
 
 val examples =
   project
-    .settings(commonSettings,
-              libraryDependencies ++= List(
-                "org.tpolecat"   %% "doobie-hikari" % "0.6.0",
-                "org.postgresql" % "postgresql"     % "42.2.5"
-              ))
+    .settings(
+      commonSettings,
+      libraryDependencies ++= List(
+        "org.tpolecat"   %% "doobie-hikari" % "0.6.0",
+        "org.postgresql" % "postgresql"     % "42.2.5"
+      )
+    )
     .settings(name += "-tests", skip in publish := true)
     .dependsOn(core)
 
 val flawless =
-  project.in(file(".")).settings(commonSettings).settings(skip in publish := true).aggregate(core, examples, tests)
+  project
+    .in(file("."))
+    .settings(commonSettings)
+    .settings(skip in publish := true)
+    .aggregate(core, examples, tests)

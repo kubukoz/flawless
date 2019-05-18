@@ -7,7 +7,7 @@ import cats.effect.IO
 import flawless.{IOTest, Suite, SuiteResult}
 
 object ExpensiveSuite extends Suite {
-  import flawless.syntax.eval._
+  import flawless.syntax._
 
   private def fib(n: Long): Long = {
     def go(a: Long, b: Long, n: Long): Long = {

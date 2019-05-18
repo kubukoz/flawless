@@ -10,7 +10,7 @@ object IOSuite extends Suite {
 
   val service: MyService[IO] = MyService.instance
 
-  import flawless.syntax.io._
+  import flawless.syntax._
 
   override val runSuite: IOTest[SuiteResult] = {
     test("job(1) and (2)")(
