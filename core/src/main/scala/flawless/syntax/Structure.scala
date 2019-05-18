@@ -24,12 +24,19 @@ abstract class Structure[A, F[_], B] {
   def convert(a: A): F[B]
 }
 
-object Structure {
-  implicit def idStructure[A]: Structure[A, Id, A] =
-    fStructure[Id, A, A]
+object Structure extends LowPriority {
+  implicit def fStructure[F[_], A, B](implicit ev: A =:= F[B]): Structure[A, F, B] = ev(_)
+}
 
-  implicit def fStructure[F[_], A, B](implicit ev: A =:= F[B]): Structure[A, F, B] =
-    new Structure[A, F, B] {
-      def convert(a: A): F[B] = ev(a)
-    }
+private[syntax] sealed trait LowPriority {
+
+  /**
+    * The instance of Structure for F = Id.
+    * This instance can be dangerous in case B (the type within F) isn't concrete: types that
+    * don't unify nicely will have this instance picked, which may result in surprising behavior (they'll be wrapped in Id no matter what).
+    *
+    * For this reason, Structure should be used with concrete B types (e.g. `Assertions`, as seen in flawless itself)
+    * or with special care (putting type annotations everywhere to be sure, which makes Structure quite useless).
+    */
+  implicit final def idStructure[A]: Structure[A, Id, A] = a => a
 }
