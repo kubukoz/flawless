@@ -8,5 +8,7 @@ trait MyService[F[_]] {
 }
 
 object MyService {
-  def instance[F[_]: Applicative]: MyService[F] = i => ("I got " + i + " problems but a test ain't one").pure[F]
+
+  def instance[F[_]: Applicative]: MyService[F] =
+    i => ("I got " + i + " problems but a test ain't one").pure[F]
 }

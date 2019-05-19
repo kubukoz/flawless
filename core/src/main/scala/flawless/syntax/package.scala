@@ -10,11 +10,11 @@ import flawless.stats.Location
 
 package object syntax {
 
-  def test[A, F[_]](name: String)(
+  def test[F[_], A](name: String)(
     ftest: A
   )(
-    implicit structure: Structure[A, F, Assertions],
-    functor: Functor[F]
+    implicit structure: Structure[A, Assertions, F],
+    f: Functor[F]
   ): F[SuiteResult] = {
     structure.convert(ftest).map { result =>
       SuiteResult(NonEmptyList.one(TestResult(name, result)))

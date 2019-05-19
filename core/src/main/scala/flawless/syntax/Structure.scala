@@ -17,15 +17,15 @@ import scala.annotation.implicitNotFound
   *
   */
 @implicitNotFound(
-  """Couldn't prove that ${A} is some F[${B}]
+  """Couldn't prove that ${A} is some F[${B}].
 See Scaladoc of flawless.syntax.Structure for help."""
 )
-abstract class Structure[A, F[_], B] {
+abstract class Structure[A, B, F[_]] {
   def convert(a: A): F[B]
 }
 
 object Structure extends LowPriority {
-  implicit def fStructure[F[_], A, B](implicit ev: A =:= F[B]): Structure[A, F, B] = ev(_)
+  implicit def fStructure[A, F[_], B](implicit ev: A =:= F[B]): Structure[A, B, F] = ev(_)
 }
 
 private[syntax] sealed trait LowPriority {
@@ -38,5 +38,5 @@ private[syntax] sealed trait LowPriority {
     * For this reason, Structure should be used with concrete B types (e.g. `Assertions`, as seen in flawless itself)
     * or with special care (putting type annotations everywhere to be sure, which makes Structure quite useless).
     */
-  implicit final def idStructure[A]: Structure[A, Id, A] = a => a
+  implicit final def idStructure[A]: Structure[A, A, Id] = a => a
 }
