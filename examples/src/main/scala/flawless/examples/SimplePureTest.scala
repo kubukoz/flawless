@@ -1,4 +1,5 @@
-package flawless.tests
+package flawless.examples
+
 import flawless.Suite
 import flawless.syntax._
 import cats.implicits._

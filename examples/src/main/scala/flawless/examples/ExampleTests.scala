@@ -31,13 +31,13 @@ object ExampleTests extends IOApp {
   }
 
   override def run(args: List[String]): IO[ExitCode] = {
-    val parallelTests = NonEmptyList.of(
+    val sequentialTests = NonEmptyList.of(
       FirstSuite,
-      FirstSuite,
-      IOSuite
+      IOSuite,
+      SimplePureTest
     )
 
-    val sequentialTests = NonEmptyList.of(
+    val parallelTests = NonEmptyList.of(
       FirstSuite,
       IOSuite
     )
@@ -57,15 +57,20 @@ object ExampleTests extends IOApp {
       } yield NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor)))
     }
 
+    val runSequentials = (
+      sequentialTests.traverse(_.runSuite)
+        |+| dbTests.use(_.traverse(_.runSuite))
+    )
+
+    val runFlaky = runUntilFailed(FlakySuite.runSuite).map(NonEmptyList.one)
+
+    val runExpensives =
+      NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).parTraverse(_.runSuite)
+
+    val runParallels = parallelTests.parTraverse(_.runSuite)
+
     runTests(args)(
-      runUntilFailed(FlakySuite.runSuite).map(NonEmptyList.one) |+|
-        NonEmptyList
-          .fromListUnsafe(List.fill(10)(ExpensiveSuite))
-          .parTraverse(_.runSuite) |+| parallelTests.parTraverse(
-        _.runSuite
-      ) |+| sequentialTests.traverse(_.runSuite) |+| dbTests.use(
-        _.parTraverse(_.runSuite)
-      )
+      runFlaky |+| runExpensives |+| runParallels |+| runSequentials
     )
   }
 }
