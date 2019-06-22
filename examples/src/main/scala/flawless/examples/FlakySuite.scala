@@ -14,5 +14,5 @@ object FlakySuite extends Suite {
 
   val runSuite: Tests[SuiteResult] = test("random(10000) =!= 0") {
     flaky.map(_ shouldBe true)
-  }
+  }.combineN(2)
 }
