@@ -1,13 +1,12 @@
 package flawless.tests
 
 import cats.data.NonEmptyList
-import cats.effect.IO
 import flawless._
 import flawless.stats._
 import cats.implicits._
 import cats.effect.ContextShift
 
-class GetStatsTest(implicit cs: ContextShift[IO]) extends Suite {
+object GetStatsTest extends Suite {
   import RunStats.Stat
   import flawless.syntax._
 
