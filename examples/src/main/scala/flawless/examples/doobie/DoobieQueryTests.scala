@@ -6,7 +6,7 @@ import doobie.Transactor
 import cats.effect.IO
 import cats.implicits._
 
-class DoobieQueryTests(xa: Transactor[IO]) extends Suite {
+final class DoobieQueryTests(xa: Transactor[IO]) extends Suite {
   import flawless.syntax._
 
   val runSuite: IO[SuiteResult] = {

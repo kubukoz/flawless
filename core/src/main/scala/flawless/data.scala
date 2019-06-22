@@ -6,9 +6,9 @@ import cats.data.NonEmptyList
 import cats.kernel.Semigroup
 import flawless.stats.Location
 
-case class AssertionFailure(text: String, location: Location)
+final case class AssertionFailure(text: String, location: Location)
 
-case class Assertions(value: NonEmptyList[Assertion])
+final case class Assertions(value: NonEmptyList[Assertion])
 
 object Assertions {
   implicit val semigroup: Semigroup[Assertions] = (a, b) => Assertions(a.value |+| b.value)
@@ -26,12 +26,12 @@ sealed trait Assertion extends Product with Serializable {
 
 object Assertion {
   case object Successful extends Assertion
-  case class Failed(failure: AssertionFailure) extends Assertion
+  final case class Failed(failure: AssertionFailure) extends Assertion
 }
 
-case class TestResult(name: String, assertions: Assertions)
+final case class TestResult(name: String, assertions: Assertions)
 
-case class SuiteResult(results: NonEmptyList[TestResult]) extends AnyVal
+final case class SuiteResult(results: NonEmptyList[TestResult]) extends AnyVal
 
 object SuiteResult {
   implicit val semigroup: Semigroup[SuiteResult] = (a, b) => SuiteResult(a.results |+| b.results)

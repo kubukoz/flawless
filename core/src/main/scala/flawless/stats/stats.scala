@@ -12,7 +12,7 @@ import monocle.Lens
 import monocle.Traversal
 import monocle.macros.GenLens
 
-case class RunStats(suite: RunStats.Stat, test: RunStats.Stat, assertion: RunStats.Stat)
+final case class RunStats(suite: RunStats.Stat, test: RunStats.Stat, assertion: RunStats.Stat)
 
 object RunStats {
 
@@ -64,7 +64,7 @@ object RunStats {
 
   private def getStat[F[_]: Foldable](suites: F[SuiteResult]) = new GetStatsPartiallyApplied(suites)
 
-  class GetStatsPartiallyApplied[F[_]: Foldable] private[RunStats] (suites: F[SuiteResult]) {
+  final class GetStatsPartiallyApplied[F[_]: Foldable] private[RunStats] (suites: F[SuiteResult]) {
 
     /**
       * Get the stats for the selected metric (as defined by the `select` traversal) of all the suites in `fa`.
@@ -81,14 +81,14 @@ object RunStats {
     }
   }
 
-  case class Stat(total: Int, successful: Int, failed: Int)
+  final case class Stat(total: Int, successful: Int, failed: Int)
 
   implicit val eq: Eq[RunStats] = Eq.fromUniversalEquals
   implicit val show: Show[RunStats] = Show.fromToString
 }
 
 //maybe this one can go to meta
-case class Location(file: String, line: Int)
+final case class Location(file: String, line: Int)
 
 object Location {
   implicit val show: Show[Location] = location => show"${location.file}:${location.line}"
