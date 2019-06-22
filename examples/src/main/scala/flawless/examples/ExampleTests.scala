@@ -17,13 +17,13 @@ import cats.effect.Console.io._
 object ExampleTests extends IOApp {
 
   //flaky test detector
-  def runUntilFailed(test: Tests[SuiteResult]): Tests[SuiteResult] =
+  def deflake(test: Tests[SuiteResult]): Tests[SuiteResult] =
     test.visit { action =>
       fs2.Stream
         .repeatEval(action)
         .zipWithIndex
         .find {
-          case (suite, _) => suite.results.exists(_.assertions.value.exists(_.isFailed))
+          case (suite, _) => suite.isFailed
         }
         .evalMap {
           case (failure, failureIndex) =>
@@ -65,7 +65,7 @@ object ExampleTests extends IOApp {
         |+| Tests.liftResource(dbTests)(Tests.parSequence(_))
     )
 
-    val runFlaky = runUntilFailed(FlakySuite.runSuite).liftA[NonEmptyList]
+    val runFlaky = deflake(FlakySuite.runSuite).liftA[NonEmptyList]
 
     val runExpensives =
       Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))

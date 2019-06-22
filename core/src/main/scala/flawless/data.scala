@@ -78,8 +78,8 @@ object Assertions {
 }
 
 sealed trait Assertion extends Product with Serializable {
-  def isSuccessful: Boolean = fold(true, _ => false)
-  def isFailed: Boolean = !isSuccessful
+  def isFailed: Boolean = fold(false, _ => true)
+  def isSuccessful: Boolean = !isFailed
 
   def fold[A](successful: => A, failed: AssertionFailure => A): A = this match {
     case Assertion.Successful       => successful
@@ -92,9 +92,15 @@ object Assertion {
   final case class Failed(failure: AssertionFailure) extends Assertion
 }
 
-final case class TestResult(name: String, assertions: Assertions)
+final case class TestResult(name: String, assertions: Assertions) {
+  def isFailed: Boolean = assertions.value.exists(_.isFailed)
+  def isSuccessful: Boolean = !isFailed
+}
 
-final case class SuiteResult(results: NonEmptyList[TestResult]) extends AnyVal
+final case class SuiteResult(results: NonEmptyList[TestResult]) extends AnyVal {
+  def isFailed: Boolean = results.exists(_.isFailed)
+  def isSuccessful: Boolean = !isFailed
+}
 
 object SuiteResult {
   implicit val semigroup: Semigroup[SuiteResult] = (a, b) => SuiteResult(a.results |+| b.results)
