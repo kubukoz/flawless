@@ -11,9 +11,10 @@ import cats.effect.ContextShift
 import cats.Applicative
 import cats.Functor
 import cats.effect.Resource
+import cats.NonEmptyParallel
 
 sealed trait Tests[A] {
-  def interpret(implicit contextShift: ContextShift[IO]): IO[A]
+  def interpret: IO[A]
   def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A]
   final def liftA[F[_]: Applicative]: Tests[F[A]] = this.map(_.pure[F])
 }
@@ -24,11 +25,14 @@ object Tests {
   def liftIO(result: IO[SuiteResult]): Tests[SuiteResult] = new Run(result) {}
   def liftResource[A, B](tests: Resource[IO, A])(f: A => Tests[B]): Tests[B] = new LiftResource(tests, f) {}
 
-  def parSequence[F[_]: NonEmptyTraverse](suites: F[Tests[SuiteResult]]): Tests[F[SuiteResult]] =
-    new Sequence(suites, true) {}
+  def parSequence[F[_]: NonEmptyTraverse](
+    suites: F[Tests[SuiteResult]]
+  )(implicit nep: NonEmptyParallel[IO, IO.Par]
+  ): Tests[F[SuiteResult]] =
+    new Sequence[F, SuiteResult](suites, Parallel.parNonEmptySequence(_)) {}
 
   def sequence[F[_]: NonEmptyTraverse](suites: F[Tests[SuiteResult]]): Tests[F[SuiteResult]] =
-    new Sequence(suites, false) {}
+    new Sequence[F, SuiteResult](suites, _.nonEmptySequence) {}
 
   implicit val testsFunctor: Functor[Tests] = new Functor[Tests] {
     def map[A, B](fa: Tests[A])(f: A => B): Tests[B] = new structure.Map(fa, f) {}
@@ -36,32 +40,34 @@ object Tests {
 
   private[flawless] object structure {
     sealed abstract case class Run(iotest: IO[SuiteResult]) extends Tests[SuiteResult] {
-      def interpret(implicit contextShift: ContextShift[IO]): IO[SuiteResult] = iotest
+      def interpret: IO[SuiteResult] = iotest
       def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[SuiteResult] = new Run(v(iotest)) {}
     }
 
     sealed abstract case class Map[A, B](tests: Tests[A], f: A => B) extends Tests[B] {
-      def interpret(implicit contextShift: ContextShift[IO]): IO[B] = tests.interpret.map(f)
+      def interpret: IO[B] = tests.interpret.map(f)
       def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[B] = new Map(tests.visit(v), f) {}
     }
 
     sealed abstract case class LiftResource[A, B](resource: Resource[IO, A], f: A => Tests[B]) extends Tests[B] {
-      def interpret(implicit contextShift: ContextShift[IO]): IO[B] = resource.use(f(_).interpret)
+      def interpret: IO[B] = resource.use(f(_).interpret)
       def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[B] = new LiftResource[A, B](resource, f(_).visit(v)) {}
     }
 
-    sealed abstract case class Sequence[F[_], A](tests: F[Tests[A]], parallel: Boolean)(implicit F: NonEmptyTraverse[F])
+    sealed abstract case class Sequence[F[_], A](
+      tests: F[Tests[A]],
+      merge: (F[IO[A]] => IO[F[A]])
+    )(implicit F: Functor[F])
       extends Tests[F[A]] {
 
-      def interpret(implicit contextShift: ContextShift[IO]): IO[F[A]] =
-        if (parallel) Parallel.parNonEmptyTraverse(tests)(_.interpret)
-        else tests.nonEmptyTraverse(_.interpret)
+      def interpret: IO[F[A]] =
+        merge(tests.map(_.interpret))
 
-      def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[F[A]] = new Sequence(tests.map(_.visit(v)), parallel) {}
+      def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[F[A]] = new Sequence(tests.map(_.visit(v)), merge) {}
     }
 
     sealed abstract case class Both[A: Semigroup](left: Tests[A], right: Tests[A]) extends Tests[A] {
-      def interpret(implicit contextShift: ContextShift[IO]): IO[A] = (left.interpret |+| right.interpret)
+      def interpret: IO[A] = (left.interpret |+| right.interpret)
       def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A] = new Both(left.visit(v), right.visit(v)) {}
     }
   }
