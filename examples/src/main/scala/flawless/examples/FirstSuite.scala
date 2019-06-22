@@ -3,14 +3,15 @@ package flawless.examples
 import cats.Id
 import cats.implicits._
 import cats.data.NonEmptyList
-import flawless.{IOTest, Suite, SuiteResult}
+import flawless.{Suite, SuiteResult}
+import cats.effect.IO
 
 object FirstSuite extends Suite {
   val service: MyService[Id] = MyService.instance
 
   import flawless.syntax._
 
-  override val runSuite: IOTest[SuiteResult] = {
+  override val runSuite: IO[SuiteResult] = {
     pureTest("job(1) and (2)")(
       service.job(1).shouldBe("I got 1 problems but a test ain't one") |+|
         service.job(2).shouldBe("I got 2 problems but a test ain't one")

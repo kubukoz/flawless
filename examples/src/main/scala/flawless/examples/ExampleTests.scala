@@ -15,7 +15,7 @@ import _root_.doobie.hikari.HikariTransactor
 object ExampleTests extends IOApp {
 
   //flaky test detector
-  def runUntilFailed(test: IOTest[SuiteResult]): IOTest[SuiteResult] = {
+  def runUntilFailed(test: IO[SuiteResult]): IO[SuiteResult] = {
     fs2.Stream
       .repeatEval(test)
       .zipWithIndex

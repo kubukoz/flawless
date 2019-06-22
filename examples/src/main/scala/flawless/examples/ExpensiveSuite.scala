@@ -1,10 +1,9 @@
 package flawless.examples
 
-import cats.Eval
-import cats.implicits._
 import cats.data.NonEmptyList
 import cats.effect.IO
-import flawless.{IOTest, Suite, SuiteResult}
+import flawless.{Suite, SuiteResult}
+import cats.implicits._
 
 object ExpensiveSuite extends Suite {
   import flawless.syntax._
@@ -19,9 +18,9 @@ object ExpensiveSuite extends Suite {
     go(1, 1, n - 2)
   }
 
-  val runSuite: IOTest[SuiteResult] = IO.eval {
+  val runSuite: IO[SuiteResult] = {
     tests(
-      test("fib(1-8)") {
+      lazyTest("fib(1-8)") {
         NonEmptyList
           .of(
             1L -> 1L,
@@ -32,11 +31,11 @@ object ExpensiveSuite extends Suite {
             6L -> 8L
           )
           .reduceMap {
-            case (x, y) => Eval.later(fib(x)).map(_ shouldBe y)
+            case (x, y) => fib(x) shouldBe y
           }
       },
-      test("fib(Int.MaxValue)") {
-        Eval.later(fib(Int.MaxValue.toLong)).map(_ shouldBe 6798988702295324957L)
+      lazyTest("fib(Int.MaxValue)") {
+        fib(Int.MaxValue.toLong) shouldBe 6798988702295324957L
       }
     )
   }

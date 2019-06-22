@@ -6,8 +6,6 @@ import cats.data.NonEmptyList
 import flawless.stats.RunStats
 
 package object flawless {
-  type IOTest[A] = IO[A]
-
   import cats.effect.Console.io._
 
   def loadArgs(args: List[String]): IO[Unit] = {
@@ -15,7 +13,7 @@ package object flawless {
     IO.unit
   }
 
-  def runTests(args: List[String])(iotest: IOTest[NonEmptyList[SuiteResult]]) =
+  def runTests(args: List[String])(iotest: IO[NonEmptyList[SuiteResult]]) =
     loadArgs(args) >> iotest.flatMap(summarize)
 
   def summarize(specs: NonEmptyList[SuiteResult]): IO[ExitCode] = {

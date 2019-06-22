@@ -1,6 +1,7 @@
 package flawless
 
 import cats.implicits._
+import cats.effect.IO
 import cats.data.NonEmptyList
 import cats.kernel.Semigroup
 import flawless.stats.Location
@@ -39,5 +40,5 @@ object SuiteResult {
 }
 
 trait Suite { self =>
-  def runSuite: IOTest[SuiteResult]
+  def runSuite: IO[SuiteResult]
 }

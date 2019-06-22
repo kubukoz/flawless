@@ -1,6 +1,7 @@
 package flawless.tests
 
 import cats.data.NonEmptyList
+import cats.effect.IO
 import flawless._
 import flawless.stats._
 import cats.implicits._
@@ -10,7 +11,7 @@ object GetStatsTest extends Suite {
   import RunStats.Stat
   import flawless.syntax._
 
-  val runSuite: IOTest[SuiteResult] = {
+  val runSuite: IO[SuiteResult] = {
     tests(
       pureTest("1 test: 1 succ / 0 fail") {
 
