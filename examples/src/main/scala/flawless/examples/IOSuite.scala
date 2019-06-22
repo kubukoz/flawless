@@ -6,6 +6,7 @@ import cats.implicits._
 
 import flawless.Suite
 import flawless.SuiteResult
+import flawless.Tests
 
 object IOSuite extends Suite {
 
@@ -13,7 +14,7 @@ object IOSuite extends Suite {
 
   import flawless.syntax._
 
-  override val runSuite: IO[SuiteResult] = {
+  override val runSuite: Tests[SuiteResult] = {
     test("job(1) and (2)")(
       service.job(1).map(_.shouldBe("I got 1 problems but a test ain't one")) |+|
         service.job(2).map(_.shouldBe("I got 2 problems but a test ain't one"))

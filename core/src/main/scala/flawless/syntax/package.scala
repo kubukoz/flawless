@@ -1,8 +1,6 @@
 package flawless
 
 import cats.Eval
-import cats.Functor
-import cats.Id
 import cats.Show
 import cats.implicits._
 import cats.data.NonEmptyList
@@ -10,19 +8,21 @@ import cats.effect.IO
 import cats.kernel.Semigroup
 import cats.kernel.Eq
 import flawless.stats.Location
+import cats.Id
 
 package object syntax {
 
-  def test[F[_]: Functor](name: String)(ftest: F[Assertions]): F[SuiteResult] =
-    ftest.map { result =>
-      SuiteResult(NonEmptyList.one(TestResult(name, result)))
-    }
+  def test(name: String)(ftest: IO[Assertions]): Tests[SuiteResult] =
+    Tests.liftIO[Id](ftest.map(toResult(name, _)))
 
-  def pureTest(name: String): Assertions => IO[SuiteResult] =
-    a => IO.pure(test[Id](name)(a))
+  def pureTest(name: String): Assertions => Tests[SuiteResult] =
+    a => test(name)(IO.pure(a))
 
-  def lazyTest(name: String)(assertions: => Assertions): IO[SuiteResult] =
-    IO.eval(test[Eval](name)(Eval.later(assertions)))
+  def lazyTest(name: String)(assertions: => Assertions): Tests[SuiteResult] =
+    test(name)(IO.eval(Eval.later(assertions)))
+
+  private def toResult(name: String, result: Assertions): SuiteResult =
+    SuiteResult(NonEmptyList.one(TestResult(name, result)))
 
   /*
    * If you like to write each test in its own line, this is a handy helper that'll make it possible.
