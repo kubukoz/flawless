@@ -6,71 +6,56 @@ import cats.data.NonEmptyList
 import cats.kernel.Semigroup
 import flawless.stats.Location
 import cats.Parallel
-import cats.~>
-import cats.Apply
-import cats.arrow.FunctionK
-import cats.NonEmptyParallel
 import cats.NonEmptyTraverse
 import cats.Foldable
 import cats.effect.ContextShift
+import cats.Applicative
+import cats.Functor
 
 sealed trait Tests[A] {
-  def interpret0(implicit contextShift: ContextShift[IO]): IO[A] = interpret(FunctionK.id)
-
-  def interpret(fk: IO ~> IO)(implicit contextShift: ContextShift[IO]): IO[A] = this match {
-    case Tests.Run(iotest)             => fk(iotest)
-    case Tests.ParMap2(left, right, f) => (left.interpret(fk), right.interpret(fk)).parMapN(f)
-    case Tests.FlatMap(fa, f)          => fk(fa.interpret(fk)).flatMap(a => fk(f(a).interpret(fk)))
-    case Tests.Pure(a)                 => IO.pure(a)
-  }
+  def interpret(implicit contextShift: ContextShift[IO]): IO[A]
+  final def liftA[F[_]: Applicative]: Tests[F[A]] = this.map(_.pure[F])
 }
 
 object Tests {
   def liftIO[F[_]: Foldable](result: IO[F[SuiteResult]]): Tests[F[SuiteResult]] = liftIOA(result)
 
-  def parallel[F[_]: NonEmptyTraverse](suites: F[Tests[SuiteResult]]): Tests[F[SuiteResult]] =
-    Parallel.parNonEmptySequence(suites)
+  def parSequence[F[_]: NonEmptyTraverse](suites: F[Tests[SuiteResult]]): Tests[F[SuiteResult]] =
+    new Sequence(suites, true) {}
 
-  def sequential[F[_]: NonEmptyTraverse](suites: F[Tests[SuiteResult]]): Tests[F[SuiteResult]] =
-    suites.nonEmptySequence
+  def sequence[F[_]: NonEmptyTraverse](suites: F[Tests[SuiteResult]]): Tests[F[SuiteResult]] =
+    new Sequence(suites, false) {}
+
+  implicit val testsFunctor: Functor[Tests] = new Functor[Tests] {
+    def map[A, B](fa: Tests[A])(f: A => B): Tests[B] = new Tests.Map(fa, f) {}
+  }
 
   private def liftIOA[A]: IO[A] => Tests[A] = new Run(_) {}
-  private def pureA[A]: A => Tests[A] = new Pure(_) {}
 
-  sealed abstract case class ParMap2[A, B, C](left: Tests[A], right: Tests[B], f: (A, B) => C) extends Tests[C]
-  sealed abstract case class FlatMap[A, B](fa: Tests[A], f: A => Tests[B]) extends Tests[B]
-  sealed abstract case class Run[A](iotest: IO[A]) extends Tests[A]
-  sealed abstract case class Pure[A](value: A) extends Tests[A]
-
-  implicit val flatMap: cats.FlatMap[Tests] = new cats.FlatMap[Tests] {
-    def flatMap[A, B](fa: Tests[A])(f: A => Tests[B]): Tests[B] = new FlatMap(fa, f) {}
-    def map[A, B](fa: Tests[A])(f: A => B): Tests[B] = new FlatMap[A, B](fa, a => pureA(f(a))) {}
-
-    def tailRecM[A, B](a: A)(f: A => Tests[Either[A, B]]): Tests[B] = f(a).flatMap {
-      case Left(a)  => tailRecM(a)(f)
-      case Right(b) => Tests.pureA(b)
-    }
+  sealed abstract case class Run[A](iotest: IO[A]) extends Tests[A] {
+    def interpret(implicit contextShift: ContextShift[IO]): IO[A] = iotest
   }
 
-  implicit val catsParalleForTests: NonEmptyParallel[Tests, ParallelTests] = new NonEmptyParallel[Tests, ParallelTests] {
-    val apply: Apply[ParallelTests] = ParallelTests.parallelApply
-    val flatMap: cats.FlatMap[Tests] = Tests.flatMap
-    val parallel: Tests ~> ParallelTests = λ[Tests ~> ParallelTests](ParallelTests(_))
-    val sequential: ParallelTests ~> Tests = λ[ParallelTests ~> Tests](_.sequential)
+  sealed abstract class Map[A, B](tests: Tests[A], f: A => B) extends Tests[B] {
+    def interpret(implicit contextShift: ContextShift[IO]): IO[B] = tests.interpret.map(f)
   }
 
-  implicit def semigroup[A: Semigroup]: Semigroup[Tests[A]] = Apply.semigroup
-}
+  sealed abstract case class Sequence[F[_], A](tests: F[Tests[A]], parallel: Boolean)(implicit F: NonEmptyTraverse[F]) extends Tests[F[A]] {
 
-final case class ParallelTests[A](sequential: Tests[A]) extends AnyVal
-
-object ParallelTests {
-  implicit val parallelApply: Apply[ParallelTests] = new Apply[ParallelTests] {
-    def map[A, B](fa: ParallelTests[A])(f: A => B): ParallelTests[B] = ParallelTests(fa.sequential.map(f))
-
-    def ap[A, B](ff: ParallelTests[A => B])(fa: ParallelTests[A]): ParallelTests[B] =
-      ParallelTests(new Tests.ParMap2[A => B, A, B](ff.sequential, fa.sequential, (f, a) => f(a)) {})
+    def interpret(implicit contextShift: ContextShift[IO]): IO[F[A]] =
+      if (parallel) Parallel.parNonEmptyTraverse(tests)(_.interpret)
+      else tests.nonEmptyTraverse(_.interpret)
   }
+
+  sealed abstract case class Pure[A](value: A) extends Tests[A] {
+    def interpret(implicit contextShift: ContextShift[IO]): IO[A] = /* value.pure[IO] */ ???
+  }
+
+  sealed abstract class Both[A: Semigroup](left: Tests[A], right: Tests[A]) extends Tests[A] {
+    def interpret(implicit contextShift: ContextShift[IO]): IO[A] = (left.interpret |+| right.interpret)
+  }
+
+  implicit def semigroup[F[_], A](implicit F: Semigroup[A]): Semigroup[Tests[A]] = new Both(_, _) {}
 }
 
 final case class AssertionFailure(text: String, location: Location)

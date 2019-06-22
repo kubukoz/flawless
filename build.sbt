@@ -32,12 +32,15 @@ val commonSettings = Seq(
   ) ++ compilerPlugins
 )
 
+val noPublish = Seq(skip in publish := true)
+
 val core = project.settings(commonSettings).settings(name += "-core")
 
 val tests =
   project
     .settings(commonSettings)
-    .settings(name += "-tests", skip in publish := true)
+    .settings(name += "-tests")
+    .settings(noPublish)
     .dependsOn(core)
 
 val examples =
@@ -50,11 +53,12 @@ val examples =
       )
     )
     .settings(name += "-tests", skip in publish := true)
+    .settings(noPublish)
     .dependsOn(core)
 
 val flawless =
   project
     .in(file("."))
     .settings(commonSettings)
-    .settings(skip in publish := true)
+    .settings(noPublish)
     .aggregate(core, examples, tests)

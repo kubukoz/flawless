@@ -17,18 +17,18 @@ object ExampleTests extends IOApp {
 
   //flaky test detector
   def runUntilFailed(test: Tests[SuiteResult]): Tests[SuiteResult] = test
-    // fs2.Stream
-    //   .repeatEval(test)
-    //   .zipWithIndex
-    //   .find {
-    //     case (suite, _) => suite.results.exists(_.assertions.value.exists(_.isFailed))
-    //   }
-    //   .evalMap {
-    //     case (failure, failureIndex) =>
-    //       putStrLn(show"Suite failed after ${failureIndex + 1} successes").as(failure)
-    //   }
-    //   .compile
-    //   .lastOrError
+  // fs2.Stream
+  //   .repeatEval(test)
+  //   .zipWithIndex
+  //   .find {
+  //     case (suite, _) => suite.results.exists(_.assertions.value.exists(_.isFailed))
+  //   }
+  //   .evalMap {
+  //     case (failure, failureIndex) =>
+  //       putStrLn(show"Suite failed after ${failureIndex + 1} successes").as(failure)
+  //   }
+  //   .compile
+  //   .lastOrError
 
   override def run(args: List[String]): IO[ExitCode] = {
     val sequentialTests = NonEmptyList.of(
@@ -54,21 +54,20 @@ object ExampleTests extends IOApp {
           connectEc,
           transactEc
         )
-      } yield Tests.sequential(NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor).runSuite)))
+      } yield Tests.sequence(NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor).runSuite)))
     }
 
-
     val runSequentials = (
-      Tests.parallel(sequentialTests.map(_.runSuite))
-        |+| Tests.liftIO(dbTests.use(_.interpret0))
+      Tests.parSequence(sequentialTests.map(_.runSuite))
+       |+| Tests.liftIO(dbTests.use(_.interpret))
     )
 
-    val runFlaky = runUntilFailed(FlakySuite.runSuite).map(NonEmptyList.one)
+    val runFlaky = runUntilFailed(FlakySuite.runSuite).liftA[NonEmptyList]
 
     val runExpensives =
-      Tests.parallel(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
+      Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
 
-    val runParallels = Tests.parallel(parallelTests.map(_.runSuite))
+    val runParallels = Tests.parSequence(parallelTests.map(_.runSuite))
 
     runTests(args)(
       runFlaky |+| runExpensives |+| runParallels |+| runSequentials
