@@ -33,47 +33,48 @@ object ExampleTests extends IOApp {
         .lastOrError
     }
 
-  override def run(args: List[String]): IO[ExitCode] = {
-    val sequentialTests = NonEmptyList.of(
-      FirstSuite,
-      IOSuite,
-      SimplePureTest
-    )
+  val sequentialTests = NonEmptyList.of(
+    FirstSuite,
+    IOSuite,
+    SimplePureTest
+  )
 
-    val parallelTests = NonEmptyList.of(
-      FirstSuite,
-      IOSuite
-    )
+  val parallelTests = NonEmptyList.of(
+    FirstSuite,
+    IOSuite
+  )
 
-    val dbTests = {
-      for {
-        connectEc  <- ExecutionContexts.fixedThreadPool[IO](10)
-        transactEc <- ExecutionContexts.cachedThreadPool[IO]
-        transactor <- HikariTransactor.newHikariTransactor[IO](
-          "org.postgresql.Driver",
-          "jdbc:postgresql://localhost:5432/postgres",
-          "postgres",
-          "postgres",
-          connectEc,
-          transactEc
-        )
-      } yield NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor).runSuite))
-    }
-
-    val runSequentials = (
-      Tests.parSequence(sequentialTests.map(_.runSuite))
-        |+| Tests.liftResource(dbTests)(Tests.parSequence(_))
-    )
-
-    val runFlaky = deflake(FlakySuite.runSuite).liftA[NonEmptyList]
-
-    val runExpensives =
-      Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
-
-    val runParallels = Tests.parSequence(parallelTests.map(_.runSuite))
-
-    runTests(args)(
-      runFlaky |+| runExpensives |+| runParallels |+| runSequentials
-    )
+  val dbTests = {
+    for {
+      connectEc  <- ExecutionContexts.fixedThreadPool[IO](10)
+      transactEc <- ExecutionContexts.cachedThreadPool[IO]
+      transactor <- HikariTransactor.newHikariTransactor[IO](
+        "org.postgresql.Driver",
+        "jdbc:postgresql://localhost:5432/postgres",
+        "postgres",
+        "postgres",
+        connectEc,
+        transactEc
+      )
+    } yield NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor).runSuite))
   }
+
+  val runSequentials = (
+    Tests.parSequence(sequentialTests.map(_.runSuite))
+      |+| Tests.liftResource(dbTests)(Tests.parSequence(_))
+  )
+
+  val runFlaky = deflake(FlakySuite.runSuite).liftA[NonEmptyList]
+
+  val runExpensives =
+    Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
+
+  val runParallels = Tests.parSequence(parallelTests.map(_.runSuite))
+
+  val testRange = runFlaky |+| runExpensives |+| runParallels |+| runSequentials
+
+  override def run(args: List[String]): IO[ExitCode] =
+    runTests(args)(
+      testRange
+    )
 }
