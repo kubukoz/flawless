@@ -5,58 +5,71 @@ import cats.effect.IO
 import cats.data.NonEmptyList
 import cats.kernel.Semigroup
 import flawless.stats.Location
-import cats.Monad
-import cats.StackSafeMonad
-import cats.Applicative
-import cats.Parallel
-import cats.~>
 import flawless.Tests.Run
 import flawless.Tests.ParMap2
 import flawless.Tests.FlatMap
-import flawless.Tests.Pure
+import cats.Parallel
+import cats.~>
+import cats.Apply
+import cats.arrow.FunctionK
+import cats.NonEmptyParallel
+import cats.NonEmptyTraverse
+import cats.Foldable
 
 sealed trait Tests[A] {
-  def visit(f: IO ~> IO): Tests[A] = Tests.Visit(this, f)
+  def interpret0(implicit parallelIO: Parallel[IO, IO.Par]): IO[A] = interpret(FunctionK.id)
 
   def interpret(fk: IO ~> IO)(implicit parallelIO: Parallel[IO, IO.Par]): IO[A] = this match {
-    case Pure(a)                 => a.pure[IO]
     case Run(iotest)             => fk(iotest)
     case ParMap2(left, right, f) => (fk(left.interpret(fk)), fk(right.interpret(fk))).parMapN(f)
     case FlatMap(fa, f)          => fk(fa.interpret(fk)).flatMap(a => fk(f(a).interpret(fk)))
-    case Tests.Visit(fa, fk)     => fa.interpret(fk)
   }
 }
 
 object Tests {
-  case class Pure[A](a: A) extends Tests[A]
-  case class ParMap2[A, B, C](left: Tests[A], right: Tests[B], f: (A, B) => C) extends Tests[C]
-  case class FlatMap[A, B](fa: Tests[A], f: A => Tests[B]) extends Tests[B]
-  case class Run[A](iotest: IO[A]) extends Tests[A]
-  case class Visit[A](tests: Tests[A], fk: IO ~> IO) extends Tests[A]
+  def liftIO[F[_]: Foldable](result: IO[F[SuiteResult]]): Tests[F[SuiteResult]] = liftIOA(result)
 
-  implicit val monad: Monad[Tests] = new StackSafeMonad[Tests] {
-    def pure[A](x: A): Tests[A] = Tests.Pure(x)
-    def flatMap[A, B](fa: Tests[A])(f: A => Tests[B]): Tests[B] = FlatMap(fa, f)
+  def parallel[F[_]: NonEmptyTraverse](suites: F[Tests[SuiteResult]]): Tests[F[SuiteResult]] =
+    Parallel.parNonEmptySequence(suites)
+
+  def sequential[F[_]: NonEmptyTraverse](suites: F[Tests[SuiteResult]]): Tests[F[SuiteResult]] =
+    suites.nonEmptySequence
+
+  private def liftIOA[A]: IO[A] => Tests[A] = new Run(_) {}
+  private def pureA[A]: A => Tests[A] = a => liftIOA(IO.pure(a))
+
+  sealed abstract case class ParMap2[A, B, C](left: Tests[A], right: Tests[B], f: (A, B) => C) extends Tests[C]
+  sealed abstract case class FlatMap[A, B](fa: Tests[A], f: A => Tests[B]) extends Tests[B]
+  sealed abstract case class Run[A](iotest: IO[A]) extends Tests[A]
+
+  implicit val flatMap: cats.FlatMap[Tests] = new cats.FlatMap[Tests] {
+    def flatMap[A, B](fa: Tests[A])(f: A => Tests[B]): Tests[B] = new FlatMap(fa, f) {}
+    def map[A, B](fa: Tests[A])(f: A => B): Tests[B] = new FlatMap[A, B](fa, a => pureA(f(a))) {}
+
+    def tailRecM[A, B](a: A)(f: A => Tests[Either[A, B]]): Tests[B] = f(a).flatMap {
+      case Left(a)  => tailRecM(a)(f)
+      case Right(b) => Tests.pureA(b)
+    }
   }
 
-  implicit val catsParalleForTests: Parallel[Tests, ParallelTests] = new Parallel[Tests, ParallelTests] {
-    val applicative: Applicative[ParallelTests] = ParallelTests.parallelApplicative
-    val monad: Monad[Tests] = Tests.monad
+  implicit val catsParalleForTests: NonEmptyParallel[Tests, ParallelTests] = new NonEmptyParallel[Tests, ParallelTests] {
+    val apply: Apply[ParallelTests] = ParallelTests.parallelApply
+    val flatMap: cats.FlatMap[Tests] = Tests.flatMap
     val parallel: Tests ~> ParallelTests = λ[Tests ~> ParallelTests](ParallelTests(_))
     val sequential: ParallelTests ~> Tests = λ[ParallelTests ~> Tests](_.sequential)
   }
+
+  implicit def semigroup[A: Semigroup]: Semigroup[Tests[A]] = Apply.semigroup
 }
 
-sealed abstract case class ParallelTests[A](val sequential: Tests[A])
+final case class ParallelTests[A](sequential: Tests[A]) extends AnyVal
 
 object ParallelTests {
-  def apply[A](tests: Tests[A]): ParallelTests[A] = new ParallelTests[A](tests) {}
-
-  implicit val parallelApplicative: Applicative[ParallelTests] = new Applicative[ParallelTests] {
-    def pure[A](x: A): ParallelTests[A] = ParallelTests(Tests.Pure(x))
+  implicit val parallelApply: Apply[ParallelTests] = new Apply[ParallelTests] {
+    def map[A, B](fa: ParallelTests[A])(f: A => B): ParallelTests[B] = ParallelTests(fa.sequential.map(f))
 
     def ap[A, B](ff: ParallelTests[A => B])(fa: ParallelTests[A]): ParallelTests[B] =
-      ParallelTests(Tests.ParMap2[A => B, A, B](ff.sequential, fa.sequential, (f, a) => f(a)))
+      ParallelTests(new Tests.ParMap2[A => B, A, B](ff.sequential, fa.sequential, (f, a) => f(a)) {})
   }
 }
 
@@ -92,5 +105,5 @@ object SuiteResult {
 }
 
 trait Suite { self =>
-  def runSuite: IO[SuiteResult]
+  def runSuite: Tests[SuiteResult]
 }

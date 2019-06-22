@@ -5,11 +5,12 @@ import flawless.SuiteResult
 import doobie.Transactor
 import cats.effect.IO
 import cats.implicits._
+import flawless.Tests
 
 final class DoobieQueryTests(xa: Transactor[IO]) extends Suite {
   import flawless.syntax._
 
-  val runSuite: IO[SuiteResult] = {
+  val runSuite: Tests[SuiteResult] = {
     import doobie.implicits._
 
     test("select 1") {

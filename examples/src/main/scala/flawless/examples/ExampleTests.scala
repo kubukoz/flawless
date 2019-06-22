@@ -8,7 +8,6 @@ import cats.effect.IO
 import cats.effect.IOApp
 import cats.implicits._
 import flawless._
-import cats.effect.Console.io._
 
 import flawless.examples.doobie.DoobieQueryTests
 import _root_.doobie.util.ExecutionContexts
@@ -17,19 +16,19 @@ import _root_.doobie.hikari.HikariTransactor
 object ExampleTests extends IOApp {
 
   //flaky test detector
-  def runUntilFailed(test: IO[SuiteResult]): IO[SuiteResult] =
-    fs2.Stream
-      .repeatEval(test)
-      .zipWithIndex
-      .find {
-        case (suite, _) => suite.results.exists(_.assertions.value.exists(_.isFailed))
-      }
-      .evalMap {
-        case (failure, failureIndex) =>
-          putStrLn(show"Suite failed after ${failureIndex + 1} successes").as(failure)
-      }
-      .compile
-      .lastOrError
+  def runUntilFailed(test: Tests[SuiteResult]): Tests[SuiteResult] = test
+    // fs2.Stream
+    //   .repeatEval(test)
+    //   .zipWithIndex
+    //   .find {
+    //     case (suite, _) => suite.results.exists(_.assertions.value.exists(_.isFailed))
+    //   }
+    //   .evalMap {
+    //     case (failure, failureIndex) =>
+    //       putStrLn(show"Suite failed after ${failureIndex + 1} successes").as(failure)
+    //   }
+    //   .compile
+    //   .lastOrError
 
   override def run(args: List[String]): IO[ExitCode] = {
     val sequentialTests = NonEmptyList.of(
@@ -55,20 +54,21 @@ object ExampleTests extends IOApp {
           connectEc,
           transactEc
         )
-      } yield NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor)))
+      } yield Tests.sequential(NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor).runSuite)))
     }
 
+
     val runSequentials = (
-      sequentialTests.traverse(_.runSuite)
-        |+| dbTests.use(_.traverse(_.runSuite))
+      Tests.parallel(sequentialTests.map(_.runSuite))
+        |+| Tests.liftIO(dbTests.use(_.interpret0))
     )
 
     val runFlaky = runUntilFailed(FlakySuite.runSuite).map(NonEmptyList.one)
 
     val runExpensives =
-      NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).parTraverse(_.runSuite)
+      Tests.parallel(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
 
-    val runParallels = parallelTests.parTraverse(_.runSuite)
+    val runParallels = Tests.parallel(parallelTests.map(_.runSuite))
 
     runTests(args)(
       runFlaky |+| runExpensives |+| runParallels |+| runSequentials

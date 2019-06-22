@@ -1,10 +1,10 @@
 package flawless.examples
 
 import cats.data.NonEmptyList
-import cats.effect.IO
 import flawless.Suite
 import flawless.SuiteResult
 import cats.implicits._
+import flawless.Tests
 
 object ExpensiveSuite extends Suite {
   import flawless.syntax._
@@ -18,7 +18,7 @@ object ExpensiveSuite extends Suite {
     go(1, 1, n - 2)
   }
 
-  val runSuite: IO[SuiteResult] = {
+  val runSuite: Tests[SuiteResult] = {
     tests(
       lazyTest("fib(1-8)") {
         NonEmptyList

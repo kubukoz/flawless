@@ -6,6 +6,7 @@ import cats.data.NonEmptyList
 import flawless.stats.RunStats
 
 package object flawless {
+  import cats.effect.ContextShift
   import cats.effect.Console.io._
 
   def loadArgs(args: List[String]): IO[Unit] = {
@@ -13,8 +14,8 @@ package object flawless {
     IO.unit
   }
 
-  def runTests(args: List[String])(iotest: IO[NonEmptyList[SuiteResult]]) =
-    loadArgs(args) >> iotest.flatMap(summarize)
+  def runTests(args: List[String])(iotest: Tests[NonEmptyList[SuiteResult]])(implicit cs: ContextShift[IO]) =
+    loadArgs(args) >> iotest.interpret0.flatMap(summarize)
 
   def summarize(specs: NonEmptyList[SuiteResult]): IO[ExitCode] = {
     import scala.io.AnsiColor
