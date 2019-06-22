@@ -25,10 +25,10 @@ val commonSettings = Seq(
   scalacOptions ++= Options.all,
   name := "flawless",
   libraryDependencies ++= List(
-    "com.github.julien-truffaut" %% "monocle-macro" % "1.5.0-cats",
-    "org.typelevel"              %% "cats-effect"   % "1.3.0",
-    "com.github.gvolpe"          %% "console4cats"  % "0.6.0",
-    "com.lihaoyi"                %% "sourcecode"    % "0.1.5"
+    "com.github.julien-truffaut" %% "monocle-macro" % "1.5.1-cats",
+    "org.typelevel"              %% "cats-effect"   % "2.0.0-M4",
+    "dev.profunktor"             %% "console4cats"  % "0.7.0",
+    "com.lihaoyi"                %% "sourcecode"    % "0.1.7"
   ) ++ compilerPlugins
 )
 
@@ -45,7 +45,7 @@ val examples =
     .settings(
       commonSettings,
       libraryDependencies ++= List(
-        "org.tpolecat"   %% "doobie-hikari" % "0.6.0",
+        "org.tpolecat"   %% "doobie-hikari" % "0.7.0",
         "org.postgresql" % "postgresql"     % "42.2.5"
       )
     )
