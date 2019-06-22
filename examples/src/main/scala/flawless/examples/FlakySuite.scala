@@ -1,7 +1,8 @@
 package flawless.examples
 
 import cats.effect.IO
-import flawless.{Suite, SuiteResult}
+import flawless.Suite
+import flawless.SuiteResult
 
 import scala.util.Random
 import cats.implicits._

@@ -2,18 +2,18 @@ package flawless.examples
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import flawless.{Suite, SuiteResult}
+import flawless.Suite
+import flawless.SuiteResult
 import cats.implicits._
 
 object ExpensiveSuite extends Suite {
   import flawless.syntax._
 
   private def fib(n: Long): Long = {
-    def go(a: Long, b: Long, n: Long): Long = {
+    def go(a: Long, b: Long, n: Long): Long =
       if (n > 0)
         go(b, a + b, n - 1)
       else b
-    }
 
     go(1, 1, n - 2)
   }

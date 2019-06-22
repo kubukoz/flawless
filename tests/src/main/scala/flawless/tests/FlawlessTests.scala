@@ -1,7 +1,9 @@
 package flawless.tests
 
 import cats.data.NonEmptyList
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.ExitCode
+import cats.effect.IO
+import cats.effect.IOApp
 import cats.implicits._
 import flawless._
 

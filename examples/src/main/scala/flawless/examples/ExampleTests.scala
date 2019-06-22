@@ -3,7 +3,9 @@ package flawless.examples
 //here goes the demo!
 
 import cats.data.NonEmptyList
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.ExitCode
+import cats.effect.IO
+import cats.effect.IOApp
 import cats.implicits._
 import flawless._
 import cats.effect.Console.io._
@@ -15,7 +17,7 @@ import _root_.doobie.hikari.HikariTransactor
 object ExampleTests extends IOApp {
 
   //flaky test detector
-  def runUntilFailed(test: IO[SuiteResult]): IO[SuiteResult] = {
+  def runUntilFailed(test: IO[SuiteResult]): IO[SuiteResult] =
     fs2.Stream
       .repeatEval(test)
       .zipWithIndex
@@ -28,7 +30,6 @@ object ExampleTests extends IOApp {
       }
       .compile
       .lastOrError
-  }
 
   override def run(args: List[String]): IO[ExitCode] = {
     val sequentialTests = NonEmptyList.of(

@@ -4,7 +4,8 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
 
-import flawless.{Suite, SuiteResult}
+import flawless.Suite
+import flawless.SuiteResult
 
 object IOSuite extends Suite {
 

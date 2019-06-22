@@ -3,7 +3,8 @@ package flawless.examples
 import cats.Id
 import cats.implicits._
 import cats.data.NonEmptyList
-import flawless.{Suite, SuiteResult}
+import flawless.Suite
+import flawless.SuiteResult
 import cats.effect.IO
 
 object FirstSuite extends Suite {

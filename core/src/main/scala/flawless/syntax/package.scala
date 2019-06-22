@@ -1,6 +1,9 @@
 package flawless
 
-import cats.{Eval, Functor, Id, Show}
+import cats.Eval
+import cats.Functor
+import cats.Id
+import cats.Show
 import cats.implicits._
 import cats.data.NonEmptyList
 import cats.effect.IO
@@ -10,13 +13,10 @@ import flawless.stats.Location
 
 package object syntax {
 
-  def test[F[_]: Functor](name: String)(
-    ftest: F[Assertions]
-  ): F[SuiteResult] = {
+  def test[F[_]: Functor](name: String)(ftest: F[Assertions]): F[SuiteResult] =
     ftest.map { result =>
       SuiteResult(NonEmptyList.one(TestResult(name, result)))
     }
-  }
 
   def pureTest(name: String): Assertions => IO[SuiteResult] =
     a => IO.pure(test[Id](name)(a))
@@ -29,20 +29,12 @@ package object syntax {
    * Instead of combining tests with the semigroup, pass them to this function
    * as you would to e.g. the List(...) constructor.
    */
-  def tests[F[_]](
-    first: F[SuiteResult],
-    others: F[SuiteResult]*
-  )(implicit S: Semigroup[F[SuiteResult]]): F[SuiteResult] =
+  def tests[F[_]](first: F[SuiteResult], others: F[SuiteResult]*)(implicit S: Semigroup[F[SuiteResult]]): F[SuiteResult] =
     NonEmptyList(first, others.toList).reduce
 
   implicit class ShouldBeSyntax[A](private val actual: A) extends AnyVal {
 
-    def shouldBe(expected: A)(
-      implicit eq: Eq[A],
-      show: Show[A],
-      file: sourcecode.File,
-      line: sourcecode.Line
-    ): Assertions = {
+    def shouldBe(expected: A)(implicit eq: Eq[A], show: Show[A], file: sourcecode.File, line: sourcecode.Line): Assertions = {
       val assertion =
         if (eq.eqv(actual, expected))
           Assertion.Successful

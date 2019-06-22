@@ -22,15 +22,13 @@ package object flawless {
     val stats = RunStats.fromSuites(specs)
 
     val weGood = stats.suite.failed === 0
-    val exit   = if (weGood) ExitCode.Success else ExitCode.Error
+    val exit = if (weGood) ExitCode.Success else ExitCode.Error
 
-    def inGreen(s: String): String = {
+    def inGreen(s: String): String =
       AnsiColor.GREEN + s + AnsiColor.RESET
-    }
 
-    def inRed(s: String): String = {
+    def inRed(s: String): String =
       AnsiColor.RED + s + AnsiColor.RESET
-    }
 
     def inColor(test: TestResult): String = {
       val successful = test.assertions.value.forall(_.isSuccessful)
