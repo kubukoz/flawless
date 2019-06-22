@@ -69,6 +69,7 @@ package object flawless {
             |$successMessage
             |$failureMessage""".stripMargin
     }
+
     val showSummary = putStrLn("============ TEST SUMMARY ============")
 
     val showResults = specs.flatMap(_.results).map(inColor).traverse(putStrLn)

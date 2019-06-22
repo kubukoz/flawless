@@ -1,25 +1,28 @@
 package flawless
 
-import cats.Functor
+import cats.{Eval, Functor, Id, Show}
 import cats.implicits._
 import cats.data.NonEmptyList
+import cats.effect.IO
 import cats.kernel.Semigroup
 import cats.kernel.Eq
-import cats.Show
 import flawless.stats.Location
 
 package object syntax {
 
-  def test[F[_], A](name: String)(
-    ftest: A
-  )(
-    implicit structure: Structure[A, Assertions, F],
-    f: Functor[F]
+  def test[F[_]: Functor](name: String)(
+    ftest: F[Assertions]
   ): F[SuiteResult] = {
-    structure.convert(ftest).map { result =>
+    ftest.map { result =>
       SuiteResult(NonEmptyList.one(TestResult(name, result)))
     }
   }
+
+  def pureTest(name: String): Assertions => IO[SuiteResult] =
+    a => IO.pure(test[Id](name)(a))
+
+  def lazyTest(name: String)(assertions: => Assertions): IO[SuiteResult] =
+    IO.eval(test[Eval](name)(Eval.later(assertions)))
 
   /*
    * If you like to write each test in its own line, this is a handy helper that'll make it possible.

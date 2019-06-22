@@ -4,18 +4,18 @@ import cats.data.NonEmptyList
 import flawless._
 import flawless.stats._
 import cats.implicits._
-import cats.effect.IO
+import cats.Id
 
 object GetStatsTest extends Suite {
   import RunStats.Stat
   import flawless.syntax._
 
-  val runSuite: IOTest[SuiteResult] = IO {
+  val runSuite: IOTest[SuiteResult] = {
     tests(
-      test("1 test: 1 succ / 0 fail") {
+      pureTest("1 test: 1 succ / 0 fail") {
 
-        val input = test("Example") {
-          (1 shouldBe 1)
+        val input = test[Id]("Example") {
+          1 shouldBe 1
         }
 
         RunStats.fromSuites(NonEmptyList.one(input)) shouldBe RunStats(
@@ -24,8 +24,8 @@ object GetStatsTest extends Suite {
           Stat(1, 1, 0)
         )
       },
-      test("1 test: 1 succ / 1 fail") {
-        val input = test("Example") {
+      pureTest("1 test: 1 succ / 1 fail") {
+        val input = test[Id]("Example") {
           (1 shouldBe 1) |+| (1 shouldBe 2)
         }
 
@@ -35,8 +35,8 @@ object GetStatsTest extends Suite {
           Stat(2, 1, 1)
         )
       },
-      test("1 test: 1 succ / 2 fail") {
-        val input = test("Example") {
+      pureTest("1 test: 1 succ / 2 fail") {
+        val input = test[Id]("Example") {
           (1 shouldBe 1) |+| (1 shouldBe 2).combineN(2)
         }
 
