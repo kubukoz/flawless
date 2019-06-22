@@ -5,12 +5,12 @@ import cats.Show
 import cats.implicits._
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.kernel.Semigroup
 import cats.kernel.Eq
 import flawless.stats.Location
 import cats.Id
 
 package object syntax {
+  import cats.NonEmptyTraverse
 
   def test(name: String)(ftest: IO[Assertions]): Tests[SuiteResult] =
     Tests.liftIO[Id](ftest.map(toResult(name, _)))
@@ -29,7 +29,7 @@ package object syntax {
    * Instead of combining tests with the semigroup, pass them to this function
    * as you would to e.g. the List(...) constructor.
    */
-  def tests[F[_]](first: F[SuiteResult], others: F[SuiteResult]*)(implicit S: Semigroup[F[SuiteResult]]): F[SuiteResult] =
+  def tests[F[_]: NonEmptyTraverse](first: Tests[SuiteResult], others: Tests[SuiteResult]*): Tests[SuiteResult] =
     NonEmptyList(first, others.toList).reduce
 
   implicit class ShouldBeSyntax[A](private val actual: A) extends AnyVal {

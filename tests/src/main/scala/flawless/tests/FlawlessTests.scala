@@ -14,6 +14,6 @@ object FlawlessTests extends IOApp {
       new GetStatsTest
     )
 
-    Tests.parallel(parallelTests.map(_.runSuite))
+    Tests.parSequence(parallelTests.map(_.runSuite))
   }
 }
