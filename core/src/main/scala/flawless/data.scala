@@ -17,6 +17,7 @@ sealed trait Tests[A] {
   def interpret: IO[A]
   def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A]
   final def liftA[F[_]: Applicative]: Tests[F[A]] = this.map(_.pure[F])
+
 }
 
 object Tests {
