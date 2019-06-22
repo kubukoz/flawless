@@ -5,9 +5,6 @@ import cats.effect.IO
 import cats.data.NonEmptyList
 import cats.kernel.Semigroup
 import flawless.stats.Location
-import flawless.Tests.Run
-import flawless.Tests.ParMap2
-import flawless.Tests.FlatMap
 import cats.Parallel
 import cats.~>
 import cats.Apply
@@ -21,9 +18,10 @@ sealed trait Tests[A] {
   def interpret0(implicit contextShift: ContextShift[IO]): IO[A] = interpret(FunctionK.id)
 
   def interpret(fk: IO ~> IO)(implicit contextShift: ContextShift[IO]): IO[A] = this match {
-    case Run(iotest)             => fk(iotest)
-    case ParMap2(left, right, f) => (fk(left.interpret(fk)), fk(right.interpret(fk))).parMapN(f)
-    case FlatMap(fa, f)          => fk(fa.interpret(fk)).flatMap(a => fk(f(a).interpret(fk)))
+    case Tests.Run(iotest)             => fk(iotest)
+    case Tests.ParMap2(left, right, f) => (left.interpret(fk), right.interpret(fk)).parMapN(f)
+    case Tests.FlatMap(fa, f)          => fk(fa.interpret(fk)).flatMap(a => fk(f(a).interpret(fk)))
+    case Tests.Pure(a)                 => IO.pure(a)
   }
 }
 
@@ -37,11 +35,12 @@ object Tests {
     suites.nonEmptySequence
 
   private def liftIOA[A]: IO[A] => Tests[A] = new Run(_) {}
-  private def pureA[A]: A => Tests[A] = a => liftIOA(IO.pure(a))
+  private def pureA[A]: A => Tests[A] = new Pure(_) {}
 
   sealed abstract case class ParMap2[A, B, C](left: Tests[A], right: Tests[B], f: (A, B) => C) extends Tests[C]
   sealed abstract case class FlatMap[A, B](fa: Tests[A], f: A => Tests[B]) extends Tests[B]
   sealed abstract case class Run[A](iotest: IO[A]) extends Tests[A]
+  sealed abstract case class Pure[A](value: A) extends Tests[A]
 
   implicit val flatMap: cats.FlatMap[Tests] = new cats.FlatMap[Tests] {
     def flatMap[A, B](fa: Tests[A])(f: A => Tests[B]): Tests[B] = new FlatMap(fa, f) {}
