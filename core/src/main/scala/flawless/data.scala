@@ -7,7 +7,6 @@ import cats.kernel.Semigroup
 import flawless.stats.Location
 import cats.Parallel
 import cats.NonEmptyTraverse
-import cats.effect.ContextShift
 import cats.Applicative
 import cats.Functor
 import cats.effect.Resource
