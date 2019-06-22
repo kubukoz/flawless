@@ -56,9 +56,9 @@ object RunStats {
     * @return (matching, nonmatching)
     */
   private def partitionAll[F[_]: Foldable, Root, Selected](
-    fa: F[Root]
-  )(select: Traversal[Root, Selected]
-  )(p: Selected => Boolean
+    fa: F[Root],
+    select: Traversal[Root, Selected],
+    p: Selected => Boolean
   ): (List[Selected], List[Selected]) =
     fa.foldMap(select.getAll(_).partition(p))
 
@@ -72,7 +72,7 @@ object RunStats {
       * */
     def of[Selected](select: Traversal[SuiteResult, Selected], traversal: Traversal[Selected, Assertion]): RunStats.Stat = {
       val (succeeded, failed) =
-        partitionAll(suites)(select)(traversal.all(_.isSuccessful))
+        partitionAll(suites, select, traversal.all(_.isSuccessful))
 
       val successCount = succeeded.size
       val failureCount = failed.size
