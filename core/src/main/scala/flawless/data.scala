@@ -15,11 +15,12 @@ import cats.arrow.FunctionK
 import cats.NonEmptyParallel
 import cats.NonEmptyTraverse
 import cats.Foldable
+import cats.effect.ContextShift
 
 sealed trait Tests[A] {
-  def interpret0(implicit parallelIO: Parallel[IO, IO.Par]): IO[A] = interpret(FunctionK.id)
+  def interpret0(implicit contextShift: ContextShift[IO]): IO[A] = interpret(FunctionK.id)
 
-  def interpret(fk: IO ~> IO)(implicit parallelIO: Parallel[IO, IO.Par]): IO[A] = this match {
+  def interpret(fk: IO ~> IO)(implicit contextShift: ContextShift[IO]): IO[A] = this match {
     case Run(iotest)             => fk(iotest)
     case ParMap2(left, right, f) => (fk(left.interpret(fk)), fk(right.interpret(fk))).parMapN(f)
     case FlatMap(fa, f)          => fk(fa.interpret(fk)).flatMap(a => fk(f(a).interpret(fk)))
