@@ -7,13 +7,12 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.kernel.Eq
 import flawless.stats.Location
-import cats.Id
 
 package object syntax {
   import cats.NonEmptyTraverse
 
   def test(name: String)(ftest: IO[Assertions]): Tests[SuiteResult] =
-    Tests.liftIO[Id](ftest.map(toResult(name, _)))
+    Tests.liftIO(ftest.map(toResult(name, _)))
 
   def pureTest(name: String): Assertions => Tests[SuiteResult] =
     a => test(name)(IO.pure(a))
@@ -34,7 +33,13 @@ package object syntax {
 
   implicit class ShouldBeSyntax[A](private val actual: A) extends AnyVal {
 
-    def shouldBe(expected: A)(implicit eq: Eq[A], show: Show[A], file: sourcecode.File, line: sourcecode.Line): Assertions = {
+    def shouldBe(
+      expected: A
+    )(implicit eq: Eq[A],
+      show: Show[A],
+      file: sourcecode.File,
+      line: sourcecode.Line
+    ): Assertions = {
       val assertion =
         if (eq.eqv(actual, expected))
           Assertion.Successful
