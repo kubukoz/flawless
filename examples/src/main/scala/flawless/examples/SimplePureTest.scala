@@ -8,7 +8,7 @@ import flawless.Tests
 
 object SimplePureTest extends Suite {
 
-  val runSuite: Tests[SuiteResult] = {
+  val runSuite: Tests.TTest[SuiteResult] = {
     pureTest("unit is unit") { () shouldBe (()) }
   }
 }

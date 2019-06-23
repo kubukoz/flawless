@@ -108,7 +108,7 @@ object Tests {
   }
 
   def liftIO(result: IO[SuiteResult]): TTest[SuiteResult] = HFix[Tests, SuiteResult](new Run(result) {})
-  // def liftResource[A, B](tests: Resource[IO, A])(f: A => Tests[B]): Tests[B] = new LiftResource(tests, f) {}
+  def liftResource[A, B](tests: Resource[IO, A])(f: A => TTest[B]): TTest[B] = HFix(new LiftResource(tests, f) {})
 
   def parSequence[S[_]: NonEmptyTraverse, A](
     suites: S[TTest[A]]

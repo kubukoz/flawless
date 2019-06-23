@@ -17,8 +17,8 @@ import cats.effect.Console.io._
 object ExampleTests extends IOApp {
 
   //flaky test detector
-  def deflake(test: Tests[SuiteResult]): Tests[SuiteResult] =
-    test.visit { action =>
+  def deflake(test: Tests.TTest[SuiteResult]): Tests.TTest[SuiteResult] =
+    test/* .visit { action =>
       fs2.Stream
         .repeatEval(action)
         .zipWithIndex
@@ -31,7 +31,7 @@ object ExampleTests extends IOApp {
         }
         .compile
         .lastOrError
-    }
+    } */
 
   val sequentialTests = NonEmptyList.of(
     FirstSuite,
@@ -64,14 +64,14 @@ object ExampleTests extends IOApp {
       |+| Tests.liftResource(dbTests)(Tests.parSequence(_))
   )
 
-  val runFlaky = deflake(FlakySuite.runSuite).liftA[NonEmptyList]
+  // val runFlaky = deflake(FlakySuite.runSuite).map(NonEmptyList.one)
 
   val runExpensives =
     Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
 
   val runParallels = Tests.parSequence(parallelTests.map(_.runSuite))
 
-  val testRange = runFlaky |+| runExpensives |+| runParallels |+| runSequentials
+  val testRange = /* runFlaky |+|  */runExpensives |+| runParallels |+| runSequentials
 
   override def run(args: List[String]): IO[ExitCode] =
     runTests(args)(
