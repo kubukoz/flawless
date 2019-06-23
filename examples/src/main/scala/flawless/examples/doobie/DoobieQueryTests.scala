@@ -10,7 +10,7 @@ import flawless.Tests
 final class DoobieQueryTests(xa: Transactor[IO]) extends Suite {
   import flawless.syntax._
 
-  val runSuite: Tests[SuiteResult] = {
+  val runSuite: Tests.TTest[SuiteResult] = {
     import doobie.implicits._
 
     test("select 1") {

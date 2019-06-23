@@ -18,7 +18,7 @@ object ExpensiveSuite extends Suite {
     go(1, 1, n - 2)
   }
 
-  val runSuite: Tests[SuiteResult] = {
+  val runSuite: Tests.TTest[SuiteResult] = {
     tests(
       lazyTest("fib(1-8)") {
         NonEmptyList

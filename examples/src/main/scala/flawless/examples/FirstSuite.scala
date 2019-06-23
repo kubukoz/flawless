@@ -12,7 +12,7 @@ object FirstSuite extends Suite {
 
   import flawless.syntax._
 
-  override val runSuite: Tests[SuiteResult] = {
+  override val runSuite: Tests.TTest[SuiteResult] = {
     pureTest("job(1) and (2)")(
       service.job(1).shouldBe("I got 1 problems but a test ain't one") |+|
         service.job(2).shouldBe("I got 2 problems but a test ain't one")
