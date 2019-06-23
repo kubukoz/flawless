@@ -14,8 +14,8 @@ package object flawless {
     IO.unit
   }
 
-  def runTests(args: List[String])(iotest: Tests[NonEmptyList[SuiteResult]])(implicit cs: ContextShift[IO]) =
-    loadArgs(args) >> iotest.interpret.flatMap(summarize)
+  // def runTests(args: List[String])(iotest: Tests[NonEmptyList[SuiteResult]])(implicit cs: ContextShift[IO]) =
+  //   loadArgs(args) >> iotest.interpret.flatMap(summarize)
 
   def summarize(specs: NonEmptyList[SuiteResult]): IO[ExitCode] = {
     import scala.io.AnsiColor
