@@ -49,6 +49,10 @@ object Tests {
 
   type JustString[A] = String
 
+  implicit class InterpretTests[A](private val tests: TTest[A]) extends AnyVal {
+    def interpret: IO[A] = hCata(Tests.interpret, tests)
+  }
+
   val interpret: HAlgebra[Tests, IO] = new HAlgebra[Tests, IO] {
 
     def apply[A](fa: Tests[IO, A]): IO[A] = fa match {
@@ -106,11 +110,11 @@ object Tests {
   def liftIO(result: IO[SuiteResult]): TTest[SuiteResult] = HFix[Tests, SuiteResult](new Run(result) {})
   // def liftResource[A, B](tests: Resource[IO, A])(f: A => Tests[B]): Tests[B] = new LiftResource(tests, f) {}
 
-  // def parSequence[F[_]: NonEmptyTraverse](
-  //   suites: F[Tests[SuiteResult]]
-  // )(implicit nep: NonEmptyParallel[IO, IO.Par]
-  // ): Tests[F[SuiteResult]] =
-  //   new Sequence[F, SuiteResult](suites, Parallel.parNonEmptySequence(_)) {}
+  def parSequence[S[_]: NonEmptyTraverse, A](
+    suites: S[TTest[A]]
+  )(implicit nep: NonEmptyParallel[IO, IO.Par]
+  ): TTest[S[A]] =
+    HFix(new Sequence[TTest, S, A](suites, Parallel.parNonEmptySequence(_), Functor[S]) {})
 
   def sequence[S[_]: NonEmptyTraverse, A](suites: S[TTest[A]]): TTest[S[A]] =
     HFix(new Sequence[TTest, S, A](suites, _.nonEmptySequence, Functor[S]) {})
