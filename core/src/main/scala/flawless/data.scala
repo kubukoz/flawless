@@ -24,6 +24,7 @@ sealed trait Tests[+F[_], A] {
 }
 
 case class HFix[F[_[_], _], A](unfix: F[HFix[F, ?], A])
+import cats.effect.Console.io._
 
 object TestsExample extends IOApp {
 
@@ -35,8 +36,9 @@ object TestsExample extends IOApp {
       }.combineN(3).pure[NonEmptyList]
     }
 
-    val r: String = Tests.hCata(Tests.show, t)
-    IO(println(r)).as(ExitCode.Success)
+    val r: IO[NonEmptyList[SuiteResult]] = Tests.hCata(Tests.interpret, t)
+
+    r.map(_.toString).flatMap(putStrLn(_)).as(ExitCode.Success)
   }
 }
 
@@ -47,7 +49,18 @@ object Tests {
 
   type JustString[A] = String
 
+  val interpret: HAlgebra[Tests, IO] = new HAlgebra[Tests, IO] {
+
+    def apply[A](fa: Tests[IO, A]): IO[A] = fa match {
+      case Run(io)                                       => io
+      case Both(left, right, implicit0(s: Semigroup[A])) => left |+| right
+      case LiftResource(r, use)                          => r.use(use)
+      case Sequence(tests, merge, _)                     => merge(tests)
+    }
+  }
+
   val show: HAlgebra[Tests, JustString] = new HAlgebra[Tests, JustString] {
+
     def apply[A](fa: Tests[JustString, A]): String = fa match {
       case Run(_)                => "iotest"
       case Both(left, right, _)  => s"Both($left |+| $right)"
