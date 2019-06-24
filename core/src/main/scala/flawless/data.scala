@@ -7,39 +7,52 @@ import cats.kernel.Semigroup
 import flawless.stats.Location
 import cats.Parallel
 import cats.NonEmptyTraverse
-import cats.Applicative
 import cats.Functor
 import cats.effect.Resource
 import cats.NonEmptyParallel
 import cats.tagless.FunctorK
-import cats.tagless.Derive
 import cats.effect.IOApp
 import cats.effect.ExitCode
 import cats.~>
 
-sealed trait Tests[+F[_], A] {
-  // def interpret: IO[A]
-  // def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A]
-  // final def liftA[F[_]: Applicative]: Tests[F[A]] = this.map(_.pure[F])
+sealed trait Tests[+F[_], A] extends Product with Serializable
+
+case class HFix[F[_[_], _], A](unfix: F[HFix[F, ?], A]) {
+
+  def hCata[G[_]](alg: HFix.HAlgebra[F, G])(implicit F: HFunctor[F]): G[A] = {
+    val rec = λ[HFix[F, ?] ~> G](_.hCata(alg))
+
+    alg {
+      F.hmap(rec)(this.unfix)
+    }
+  }
 }
 
-case class HFix[F[_[_], _], A](unfix: F[HFix[F, ?], A])
+object HFix {
+  type HAlgebra[F[_[_], _], G[_]] = F[G, ?] ~> G
+}
+
+trait HFunctor[F[_[_], _]] {
+  def hmap[G[_], I[_]](nt: G ~> I): F[G, ?] ~> F[I, ?]
+}
+
 import cats.effect.Console.io._
 
 object TestsExample extends IOApp {
 
-  def run(args: List[String]): IO[ExitCode] = {
-    import flawless.syntax._
-    val t = Tests.sequence {
-      test("foo") {
-        IO(1).map(_ shouldBe 1)
-      }.combineN(3).pure[NonEmptyList]
-    }
+  import flawless.syntax._
 
-    val r: IO[NonEmptyList[SuiteResult]] = Tests.hCata(Tests.interpret, t)
-
-    r.map(_.toString).flatMap(putStrLn(_)).as(ExitCode.Success)
+  val tests = Tests.sequence {
+    test("foo") {
+      IO(1).map(_ shouldBe 1)
+    }.combineN(3).pure[NonEmptyList]
   }
+
+  val prog = putStrLn("Interpreting tests. Text:") *>
+    putStrLn(tests.debug) *>
+    tests.interpret
+
+  def run(args: List[String]): IO[ExitCode] = prog.map(_.toString).flatMap(putStrLn(_)).as(ExitCode.Success)
 }
 
 object Tests {
@@ -47,13 +60,13 @@ object Tests {
 
   import structure._
 
-  type JustString[A] = String
-
   implicit class InterpretTests[A](private val tests: TTest[A]) extends AnyVal {
-    def interpret: IO[A] = hCata(Tests.interpret, tests)
+    def interpret: IO[A] = tests.hCata(Tests.interpret)
+    def visit(v: IO[SuiteResult] => IO[SuiteResult]): TTest[A] = tests.hCata(Tests.visitRun(v))
+    def debug: String = tests.hCata(Tests.show)
   }
 
-  val interpret: HAlgebra[Tests, IO] = new HAlgebra[Tests, IO] {
+  val interpret: HFix.HAlgebra[Tests, IO] = new HFix.HAlgebra[Tests, IO] {
 
     def apply[A](fa: Tests[IO, A]): IO[A] = fa match {
       case Run(io)                                       => io
@@ -63,7 +76,17 @@ object Tests {
     }
   }
 
-  val show: HAlgebra[Tests, JustString] = new HAlgebra[Tests, JustString] {
+  def visitRun(mod: IO[SuiteResult] => IO[SuiteResult]): HFix.HAlgebra[Tests, TTest] = new HFix.HAlgebra[Tests, TTest] {
+
+    def apply[A](fa: Tests[TTest, A]): TTest[A] = fa match {
+      case Run(io) => HFix[Tests, A](new Run(mod(io)) {})
+      case e       => HFix(e)
+    }
+  }
+
+  type JustString[A] = String
+
+  val show: HFix.HAlgebra[Tests, JustString] = new HFix.HAlgebra[Tests, JustString] {
 
     def apply[A](fa: Tests[JustString, A]): String = fa match {
       case Run(_)                => "iotest"
@@ -73,7 +96,7 @@ object Tests {
     }
   }
 
-  implicit def functorkTests[A]: FunctorK[Tests[?[_], A]] = new FunctorK[Tests[?[_], A]] {
+  implicit def testsFunctorK[A]: FunctorK[Tests[?[_], A]] = new FunctorK[Tests[?[_], A]] {
 
     def mapK[F[_], G[_]](af: Tests[F, A])(fk: F ~> G): Tests[G, A] = af match {
       case Run(iotest)              => new Run(iotest) {}
@@ -83,28 +106,11 @@ object Tests {
     }
   }
 
-  type HAlgebra[F[_[_], _], G[_]] = F[G, ?] ~> G
-
-  trait HFunctor[F[_[_], _]] {
-    def hmap[G[_], I[_]](nt: G ~> I): F[G, ?] ~> F[I, ?]
-  }
-
   implicit val testsHFunctor: HFunctor[Tests] = new HFunctor[Tests] {
 
     def hmap[G[_], I[_]](nt: G ~> I): Tests[G, ?] ~> Tests[I, ?] = new (Tests[G, ?] ~> Tests[I, ?]) {
-      def apply[A](fa: Tests[G, A]): Tests[I, A] = functorkTests[A].mapK(fa)(nt)
+      def apply[A](fa: Tests[G, A]): Tests[I, A] = testsFunctorK[A].mapK(fa)(nt)
     }
-  }
-
-  def hCata[F[_[_], _], G[_], I](alg: HAlgebra[F, G], hfix: HFix[F, I])(implicit F: HFunctor[F]): G[I] = {
-    val inner = hfix.unfix
-    val nt = F.hmap(
-      new (HFix[F, ?] ~> G) {
-        def apply[A](fa: HFix[F, A]): G[A] = hCata(alg, fa)
-      }
-    )(inner)
-
-    alg(nt)
   }
 
   def liftIO(result: IO[SuiteResult]): TTest[SuiteResult] = HFix[Tests, SuiteResult](new Run(result) {})
