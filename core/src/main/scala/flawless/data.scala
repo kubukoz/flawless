@@ -19,7 +19,7 @@ sealed trait Tests[+F[_], A] extends Product with Serializable
 
 case class HFix[F[_[_], _], A](unfix: F[HFix[F, ?], A]) {
 
-  def hCata[G[_]](alg: HFix.HAlgebra[F, G])(implicit F: HFunctor[F]): G[A] = {
+  def hCata[G[_]](alg: algebra.HAlgebra[F, G])(implicit F: HFunctor[F]): G[A] = {
     val rec = λ[HFix[F, ?] ~> G](_.hCata(alg))
 
     alg {
@@ -28,7 +28,7 @@ case class HFix[F[_[_], _], A](unfix: F[HFix[F, ?], A]) {
   }
 }
 
-object HFix {
+object algebra {
   type HAlgebra[F[_[_], _], G[_]] = F[G, ?] ~> G
 }
 
@@ -60,41 +60,45 @@ object Tests {
 
   import structure._
 
-  implicit class InterpretTests[A](private val tests: TTest[A]) extends AnyVal {
-    def interpret: IO[A]                                       = tests.hCata(Tests.interpret)
-    def visit(v: IO[SuiteResult] => IO[SuiteResult]): TTest[A] = tests.hCata(Tests.visitRun(v))
-    def debug: String                                          = tests.hCata(Tests.show)
+  implicit class TestsExtensions[A](private val tests: TTest[A]) extends AnyVal {
+    def interpret: IO[A] = tests.hCata(Tests.algebras.interpret)
+    def visit(v: IO[SuiteResult] => IO[SuiteResult]): TTest[A] = tests.hCata(Tests.algebras.visitRun(v))
+    def debug: String = tests.hCata(Tests.algebras.show)
   }
 
-  val interpret: HFix.HAlgebra[Tests, IO] = new HFix.HAlgebra[Tests, IO] {
+  object algebras {
 
-    def apply[A](fa: Tests[IO, A]): IO[A] = fa match {
-      case Pure(result)                                  => IO.pure(result)
-      case Run(io)                                       => io
-      case Both(left, right, implicit0(s: Semigroup[A])) => left |+| right
-      case LiftResource(r, use)                          => r.use(use)
-      case Sequence(tests, merge, _)                     => merge(tests)
+    val interpret: algebra.HAlgebra[Tests, IO] = new algebra.HAlgebra[Tests, IO] {
+
+      def apply[A](fa: Tests[IO, A]): IO[A] = fa match {
+        case Pure(result)                                  => IO.pure(result)
+        case Run(io)                                       => io
+        case Both(left, right, implicit0(s: Semigroup[A])) => left |+| right
+        case LiftResource(r, use)                          => r.use(use)
+        case Sequence(tests, merge, _)                     => merge(tests)
+      }
     }
-  }
 
-  def visitRun(mod: IO[SuiteResult] => IO[SuiteResult]): HFix.HAlgebra[Tests, TTest] = new HFix.HAlgebra[Tests, TTest] {
+    def visitRun(mod: IO[SuiteResult] => IO[SuiteResult]): algebra.HAlgebra[Tests, TTest] =
+      new algebra.HAlgebra[Tests, TTest] {
 
-    def apply[A](fa: Tests[TTest, A]): TTest[A] = fa match {
-      case Run(io) => HFix[Tests, A](Run(mod(io)))
-      case e       => HFix(e)
-    }
-  }
+        def apply[A](fa: Tests[TTest, A]): TTest[A] = fa match {
+          case Run(io) => HFix[Tests, A](Run(mod(io)))
+          case e       => HFix(e)
+        }
+      }
 
-  type JustString[A] = String
+    type JustString[A] = String
 
-  val show: HFix.HAlgebra[Tests, JustString] = new HFix.HAlgebra[Tests, JustString] {
+    val show: algebra.HAlgebra[Tests, JustString] = new algebra.HAlgebra[Tests, JustString] {
 
-    def apply[A](fa: Tests[JustString, A]): String = fa match {
-      case Pure(result)          => s"result($result)"
-      case Run(_)                => "iotest"
-      case Both(left, right, _)  => s"Both($left |+| $right)"
-      case LiftResource(_, _)    => s"LiftResource(<resource>, <function>)"
-      case Sequence(tests, _, _) => s"Sequence($tests, <function>)"
+      def apply[A](fa: Tests[JustString, A]): String = fa match {
+        case Pure(result)          => s"result($result)"
+        case Run(_)                => "iotest"
+        case Both(left, right, _)  => s"Both($left |+| $right)"
+        case LiftResource(_, _)    => s"LiftResource(<resource>, <function>)"
+        case Sequence(tests, _, _) => s"Sequence($tests, <function>)"
+      }
     }
   }
 
@@ -116,7 +120,7 @@ object Tests {
     }
   }
 
-  def liftIO(result: IO[SuiteResult]): TTest[SuiteResult]                    = HFix[Tests, SuiteResult](Run(result))
+  def liftIO(result: IO[SuiteResult]): TTest[SuiteResult] = HFix[Tests, SuiteResult](Run(result))
   def liftResource[A, B](tests: Resource[IO, A])(f: A => TTest[B]): TTest[B] = HFix(LiftResource(tests, f))
 
   def parSequence[S[_]: NonEmptyTraverse, A](suites: S[TTest[A]])(implicit nep: NonEmptyParallel[IO, IO.Par]): TTest[S[A]] =
@@ -126,10 +130,10 @@ object Tests {
     HFix(Sequence[TTest, S, A](suites, _.nonEmptySequence, Functor[S]))
 
   private[flawless] object structure {
-    final case class Pure(result: SuiteResult)                                                                 extends Tests[Nothing, SuiteResult]
-    final case class Run(iotest: IO[SuiteResult])                                                              extends Tests[Nothing, SuiteResult]
-    final case class Both[F[_], A](left: F[A], right: F[A], sem: Semigroup[A])                                 extends Tests[F, A]
-    final case class LiftResource[F[_], A, B](resource: Resource[IO, A], f: A => F[B])                         extends Tests[F, B]
+    final case class Pure(result: SuiteResult) extends Tests[Nothing, SuiteResult]
+    final case class Run(iotest: IO[SuiteResult]) extends Tests[Nothing, SuiteResult]
+    final case class Both[F[_], A](left: F[A], right: F[A], sem: Semigroup[A]) extends Tests[F, A]
+    final case class LiftResource[F[_], A, B](resource: Resource[IO, A], f: A => F[B]) extends Tests[F, B]
     final case class Sequence[F[_], S[_], A](tests: S[F[A]], merge: S[IO[A]] => IO[S[A]], functor: Functor[S]) extends Tests[F, S[A]]
   }
 
@@ -146,7 +150,7 @@ object Assertions {
 }
 
 sealed trait Assertion extends Product with Serializable {
-  def isFailed: Boolean     = fold(false, _ => true)
+  def isFailed: Boolean = fold(false, _ => true)
   def isSuccessful: Boolean = !isFailed
 
   def fold[A](successful: => A, failed: AssertionFailure => A): A = this match {
@@ -156,17 +160,17 @@ sealed trait Assertion extends Product with Serializable {
 }
 
 object Assertion {
-  case object Successful                             extends Assertion
+  case object Successful extends Assertion
   final case class Failed(failure: AssertionFailure) extends Assertion
 }
 
 final case class TestResult(name: String, assertions: Assertions) {
-  def isFailed: Boolean     = assertions.value.exists(_.isFailed)
+  def isFailed: Boolean = assertions.value.exists(_.isFailed)
   def isSuccessful: Boolean = !isFailed
 }
 
 final case class SuiteResult(results: NonEmptyList[TestResult]) extends AnyVal {
-  def isFailed: Boolean     = results.exists(_.isFailed)
+  def isFailed: Boolean = results.exists(_.isFailed)
   def isSuccessful: Boolean = !isFailed
 }
 
