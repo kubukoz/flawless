@@ -18,7 +18,7 @@ object ExampleTests extends IOApp {
 
   //flaky test detector
   def deflake(test: Tests.TTest[SuiteResult]): Tests.TTest[SuiteResult] =
-    test/* .visit { action =>
+    test.visit { action =>
       fs2.Stream
         .repeatEval(action)
         .zipWithIndex
@@ -31,7 +31,7 @@ object ExampleTests extends IOApp {
         }
         .compile
         .lastOrError
-    } */
+    }
 
   val sequentialTests = NonEmptyList.of(
     FirstSuite,
@@ -61,17 +61,17 @@ object ExampleTests extends IOApp {
 
   val runSequentials = (
     Tests.parSequence(sequentialTests.map(_.runSuite))
-      |+| Tests.liftResource(dbTests)(Tests.parSequence(_))
+    // |+| Tests.liftResource(dbTests)(Tests.parSequence(_))
   )
 
-  // val runFlaky = deflake(FlakySuite.runSuite).map(NonEmptyList.one)
+  val runFlaky = Tests.sequence(NonEmptyList.one(deflake(FlakySuite.runSuite)))
 
   val runExpensives =
     Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
 
   val runParallels = Tests.parSequence(parallelTests.map(_.runSuite))
 
-  val testRange = /* runFlaky |+|  */runExpensives |+| runParallels |+| runSequentials
+  val testRange = runFlaky |+| runExpensives |+| runParallels |+| runSequentials
 
   override def run(args: List[String]): IO[ExitCode] =
     runTests(args)(
