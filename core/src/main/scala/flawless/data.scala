@@ -2,15 +2,17 @@ package flawless
 
 import cats.Functor
 import cats.NonEmptyParallel
+import cats.data.NonEmptyChain
 import cats.NonEmptyTraverse
 import cats.Parallel
+import cats.Show
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.Resource
 import cats.implicits._
 import cats.kernel.Semigroup
 import flawless.data.low.Tests
-import flawless.data.low.Tests.Both
+import flawless.data.low.Tests.Merge
 import flawless.data.low.Tests.LiftResource
 import flawless.data.low.Tests.Run
 import flawless.data.low.Tests.Sequence
@@ -20,7 +22,8 @@ import flawless.stats.Location
 final class TTest[A] private[flawless] (private[flawless] val tree: HFix[Tests, A]) {
   def interpret: IO[A] = HFix.hCata(tree)(Tests.algebras.interpret)
   def visit(v: IO[SuiteResult] => IO[SuiteResult]): TTest[A] = HFix.hCata(tree)(Tests.algebras.visitRun(v))
-  def debug: String = HFix.hCata(tree)(Tests.algebras.show)
+
+  def debugRun: IO[String] = HFix.hCata(tree)(Tests.algebras.show)
 }
 
 object TTest {
@@ -33,8 +36,12 @@ object TTest {
   def sequence[S[_]: NonEmptyTraverse, A](suites: S[TTest[A]]): TTest[S[A]] =
     new TTest(HFix(Sequence[Tests.HFixed, S, A](suites.map(_.tree), _.nonEmptySequence, Functor[S])))
 
-  implicit def semigroup[F[_], A](implicit F: Semigroup[A]): Semigroup[TTest[A]] =
-    (a, b) => new TTest(HFix[Tests, A](Both(a.tree, b.tree, F)))
+  implicit def semigroup[F[_], A](implicit A: Semigroup[A]): Semigroup[TTest[A]] =
+    (a, b) => new TTest(HFix[Tests, A](Merge(NonEmptyChain(a.tree, b.tree), A)))
+
+  implicit val functor: Functor[TTest] = new Functor[TTest] {
+    override def map[A, B](fa: TTest[A])(f: A => B): TTest[B] = new TTest(HFix(Tests.Map(fa.tree, f)))
+  }
 }
 
 final case class AssertionFailure(text: String, location: Location)
@@ -72,6 +79,7 @@ final case class SuiteResult(results: NonEmptyList[TestResult]) extends AnyVal {
 
 object SuiteResult {
   implicit val semigroup: Semigroup[SuiteResult] = (a, b) => SuiteResult(a.results |+| b.results)
+  implicit val show: Show[SuiteResult] = Show.fromToString
 }
 
 trait Suite { self =>

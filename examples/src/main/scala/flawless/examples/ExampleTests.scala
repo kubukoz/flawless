@@ -63,7 +63,7 @@ object ExampleTests extends IOApp {
       |+| TTest.liftResource(dbTests)(TTest.parSequence(_))
   )
 
-  val runFlaky = TTest.sequence(NonEmptyList.one(deflake(FlakySuite.runSuite)))
+  val runFlaky = deflake(FlakySuite.runSuite).map(NonEmptyList.one)
 
   val runExpensives =
     TTest.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
@@ -71,9 +71,10 @@ object ExampleTests extends IOApp {
   val runParallels = TTest.parSequence(parallelTests.map(_.runSuite))
 
   val testRange = runFlaky |+| runExpensives |+| runParallels |+| runSequentials
-
+  import cats.effect.Console.io._
   override def run(args: List[String]): IO[ExitCode] =
-    runTests(args)(
+    /*runTests(args)(
       testRange
-    )
+    )*/
+    testRange.debugRun.flatMap(putStrLn(_)).as(ExitCode.Success)
 }
