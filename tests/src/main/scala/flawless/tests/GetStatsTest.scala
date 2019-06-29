@@ -9,7 +9,7 @@ object GetStatsTest extends Suite {
   import RunStats.Stat
   import flawless.syntax._
 
-  val runSuite: Tests.TTest[SuiteResult] = {
+  val runSuite: TTest[SuiteResult] = {
     tests(
       test("1 test: 1 succ / 0 fail") {
 
