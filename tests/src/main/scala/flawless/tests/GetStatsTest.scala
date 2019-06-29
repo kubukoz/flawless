@@ -17,9 +17,9 @@ object GetStatsTest extends Suite {
           1 shouldBe 1
         }.interpret.map { input =>
           RunStats.fromSuites(NonEmptyList.one(input)) shouldBe RunStats(
-            Stat(1, 1, 0),
-            Stat(1, 1, 0),
-            Stat(1, 1, 0)
+            suite = Stat(1, 1, 0),
+            test = Stat(1, 1, 0),
+            assertion = Stat(1, 1, 0)
           )
         }
       },
@@ -28,9 +28,9 @@ object GetStatsTest extends Suite {
           (1 shouldBe 1) |+| (1 shouldBe 2)
         }.interpret.map { input =>
           RunStats.fromSuites(NonEmptyList.of(input)) shouldBe RunStats(
-            Stat(1, 0, 1),
-            Stat(1, 0, 1),
-            Stat(2, 1, 1)
+            suite = Stat(1, 0, 1),
+            test = Stat(1, 0, 1),
+            assertion = Stat(2, 1, 1)
           )
         }
       },
@@ -39,9 +39,9 @@ object GetStatsTest extends Suite {
           (1 shouldBe 1) |+| (1 shouldBe 2).combineN(2)
         }.interpret.map { input =>
           RunStats.fromSuites(NonEmptyList.of(input)) shouldBe RunStats(
-            Stat(1, 0, 1),
-            Stat(1, 0, 1),
-            Stat(3, 1, 2)
+            suite = Stat(1, 0, 1),
+            test = Stat(1, 0, 1),
+            assertion = Stat(3, 1, 2)
           )
         }
       }
