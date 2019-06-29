@@ -1,25 +1,25 @@
 package flawless
 
-import cats.Functor
-import cats.NonEmptyParallel
 import cats.data.NonEmptyChain
-import cats.NonEmptyTraverse
-import cats.Parallel
-import cats.Show
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.Resource
 import cats.implicits._
 import cats.kernel.Semigroup
+import cats.Functor
+import cats.Id
+import cats.NonEmptyParallel
+import cats.NonEmptyTraverse
+import cats.Parallel
+import cats.Show
 import flawless.data.low.TestAlg
-import flawless.data.low.TestAlg.Merge
 import flawless.data.low.TestAlg.LiftResource
+import flawless.data.low.TestAlg.Merge
 import flawless.data.low.TestAlg.Run
-import flawless.data.low.TestAlg.Sequence
 import flawless.fixpoint.HFix
 import flawless.stats.Location
 
-final class Tests[A] private[flawless](private[flawless] val tree: HFix[TestAlg, A]) {
+final class Tests[A] private[flawless] (private[flawless] val tree: HFix[TestAlg, A]) {
   def interpret: IO[A] = HFix.hCata(tree)(TestAlg.algebras.interpret)
   def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A] = HFix.hCata(tree)(TestAlg.algebras.visitRun(v))
 
@@ -31,15 +31,24 @@ object Tests {
   def liftResource[A, B](tests: Resource[IO, A])(f: A => Tests[B]): Tests[B] = new Tests(HFix(LiftResource(tests, f.map(_.tree))))
 
   def parSequence[S[_]: NonEmptyTraverse, A](suites: S[Tests[A]])(implicit nep: NonEmptyParallel[IO, IO.Par]): Tests[S[A]] =
-    new Tests(HFix(Sequence[TestAlg.HFixed, S, A](suites.map(_.tree), Parallel.parNonEmptySequence(_), Functor[S])))
+    new Tests(HFix(Merge[TestAlg.HFixed, S, S, A](suites.map(_.tree), Parallel.parNonEmptySequence(_), Functor[S])))
 
   def sequence[S[_]: NonEmptyTraverse, A](suites: S[Tests[A]]): Tests[S[A]] =
-    new Tests(HFix(Sequence[TestAlg.HFixed, S, A](suites.map(_.tree), _.nonEmptySequence, Functor[S])))
+    new Tests(HFix(Merge[TestAlg.HFixed, S, S, A](suites.map(_.tree), _.nonEmptySequence, Functor[S])))
 
   //todo test
   implicit def semigroup[F[_], A](implicit A: Semigroup[A]): Semigroup[Tests[A]] =
-    (a, b) => new Tests(HFix[TestAlg, A](Merge(NonEmptyChain(a.tree, b.tree), A)))
+    (a, b) => {
+      val alg: TestAlg[TestAlg.HFixed, A] =
+        Merge[TestAlg.HFixed, NonEmptyChain, Id, A](NonEmptyChain(a.tree, b.tree), _.reduce, Functor[NonEmptyChain])
 
+      new Tests(
+        HFix[TestAlg, A](alg)
+      )
+    }
+
+  //todo test
+  //todo consider removing (replace with some method of lifting A to an effect like NonEmptyList)
   implicit val functor: Functor[Tests] = new Functor[Tests] {
     override def map[A, B](fa: Tests[A])(f: A => B): Tests[B] = new Tests(HFix(TestAlg.Map(fa.tree, f)))
   }
