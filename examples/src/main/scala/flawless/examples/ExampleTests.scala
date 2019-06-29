@@ -16,7 +16,7 @@ import cats.effect.Console.io._
 object ExampleTests extends IOApp {
 
   //flaky test detector
-  def deflake(test: TTest[SuiteResult]): TTest[SuiteResult] =
+  def deflake(test: Tests[SuiteResult]): Tests[SuiteResult] =
     test.visit { action =>
       fs2.Stream
         .repeatEval(action)
@@ -59,16 +59,16 @@ object ExampleTests extends IOApp {
   }
 
   val runSequentials = (
-    TTest.parSequence(sequentialTests.map(_.runSuite))
-      |+| TTest.liftResource(dbTests)(TTest.parSequence(_))
+    Tests.parSequence(sequentialTests.map(_.runSuite))
+      |+| Tests.liftResource(dbTests)(Tests.parSequence(_))
   )
 
   val runFlaky = deflake(FlakySuite.runSuite).map(NonEmptyList.one)
 
   val runExpensives =
-    TTest.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
+    Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
 
-  val runParallels = TTest.parSequence(parallelTests.map(_.runSuite))
+  val runParallels = Tests.parSequence(parallelTests.map(_.runSuite))
 
   val testRange = runFlaky |+| runExpensives |+| runParallels |+| runSequentials
   import cats.effect.Console.io._

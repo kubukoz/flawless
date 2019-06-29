@@ -11,13 +11,13 @@ import flawless.stats.Location
 package object syntax {
   import cats.NonEmptyTraverse
 
-  def test(name: String)(ftest: IO[Assertions]): TTest[SuiteResult] =
-    TTest.liftIO(ftest.map(toResult(name, _)))
+  def test(name: String)(ftest: IO[Assertions]): Tests[SuiteResult] =
+    Tests.liftIO(ftest.map(toResult(name, _)))
 
-  def pureTest(name: String): Assertions => TTest[SuiteResult] =
+  def pureTest(name: String): Assertions => Tests[SuiteResult] =
     a => test(name)(IO.pure(a))
 
-  def lazyTest(name: String)(assertions: => Assertions): TTest[SuiteResult] =
+  def lazyTest(name: String)(assertions: => Assertions): Tests[SuiteResult] =
     test(name)(IO.eval(Eval.later(assertions)))
 
   private def toResult(name: String, result: Assertions): SuiteResult =
@@ -28,7 +28,7 @@ package object syntax {
    * Instead of combining tests with the semigroup, pass them to this function
    * as you would to e.g. the List(...) constructor.
    */
-  def tests[F[_]: NonEmptyTraverse](first: TTest[SuiteResult], others: TTest[SuiteResult]*): TTest[SuiteResult] =
+  def tests[F[_]: NonEmptyTraverse](first: Tests[SuiteResult], others: Tests[SuiteResult]*): Tests[SuiteResult] =
     NonEmptyList(first, others.toList).reduce
 
   implicit class ShouldBeSyntax[A](private val actual: A) extends AnyVal {
