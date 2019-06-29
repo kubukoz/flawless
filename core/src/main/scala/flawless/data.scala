@@ -10,7 +10,7 @@ import cats.NonEmptyTraverse
 import cats.Functor
 import cats.effect.Resource
 import cats.NonEmptyParallel
-import cats.tagless.FunctorK
+import cats.tagless.{Derive, FunctorK}
 import cats.effect.IOApp
 import cats.effect.ExitCode
 import cats.~>
@@ -52,7 +52,7 @@ object TestsExample extends IOApp {
     putStrLn(tests.debug) *>
     tests.interpret
 
-  def run(args: List[String]): IO[ExitCode] = prog.map(_.toString).flatMap(putStrLn(_)).as(ExitCode.Success)
+  def run(args: List[String]): IO[ExitCode] = prog.map(_.toString).flatMap(putStrLn).as(ExitCode.Success)
 }
 
 object Tests {
