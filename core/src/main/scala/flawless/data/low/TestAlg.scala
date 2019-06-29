@@ -49,16 +49,6 @@ object TestAlg {
         }
       }
 
-    /*val recover: HAlgebra[TestAlg, Tests] =
-      new algebra.HAlgebra[TestAlg, Tests] {
-
-        def apply[A](fa: TestAlg[Tests, A]): Tests[A] = fa match {
-          case Run(io) => new Tests(HFix[TestAlg, A](Run(io.recoverWith)))
-          case LiftResource(resource, f, _) => new Tests(HFix[TestAlg, A]()
-          case e       => new Tests(HFix[TestAlg, A](testsFunctorK[A].mapK(e)(λ[Tests ~> HFixed](_.tree))))
-        }
-      }
-*/
     type IOString[_] = IO[String]
 
     val show: algebra.HAlgebra[TestAlg, IOString] = new algebra.HAlgebra[TestAlg, IOString] {
