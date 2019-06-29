@@ -1,9 +1,10 @@
 package flawless.examples
 
 import cats.data.NonEmptyList
-import flawless.{Suite, SuiteResult, Tests}
+import flawless.Suite
+import flawless.SuiteResult
+import flawless.Tests
 import cats.implicits._
-import flawless.data.low.TestAlg
 
 object ExpensiveSuite extends Suite {
   import flawless.syntax._
