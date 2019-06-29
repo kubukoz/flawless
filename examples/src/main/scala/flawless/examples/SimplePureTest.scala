@@ -1,10 +1,8 @@
 package flawless.examples
 
-import flawless.Suite
-import flawless.syntax._
 import cats.implicits._
-import flawless.SuiteResult
-import flawless.Tests
+import flawless.syntax._
+import flawless.{Suite, SuiteResult, Tests}
 
 object SimplePureTest extends Suite {
 

@@ -8,7 +8,6 @@ import cats.effect.IO
 import cats.effect.IOApp
 import cats.implicits._
 import flawless._
-
 import flawless.examples.doobie.DoobieQueryTests
 import _root_.doobie.util.ExecutionContexts
 import _root_.doobie.hikari.HikariTransactor
@@ -64,7 +63,7 @@ object ExampleTests extends IOApp {
       |+| Tests.liftResource(dbTests)(Tests.parSequence(_))
   )
 
-  val runFlaky = deflake(FlakySuite.runSuite).liftA[NonEmptyList]
+  val runFlaky = deflake(FlakySuite.runSuite).map(NonEmptyList.one)
 
   val runExpensives =
     Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
@@ -72,9 +71,10 @@ object ExampleTests extends IOApp {
   val runParallels = Tests.parSequence(parallelTests.map(_.runSuite))
 
   val testRange = runFlaky |+| runExpensives |+| runParallels |+| runSequentials
-
+  import cats.effect.Console.io._
   override def run(args: List[String]): IO[ExitCode] =
     runTests(args)(
       testRange
     )
+//    testRange.debugRun.flatMap(putStrLn(_)).as(ExitCode.Success)
 }

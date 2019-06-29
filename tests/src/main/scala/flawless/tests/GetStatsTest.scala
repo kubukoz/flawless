@@ -4,7 +4,6 @@ import cats.data.NonEmptyList
 import flawless._
 import flawless.stats._
 import cats.implicits._
-import cats.effect.ContextShift
 
 object GetStatsTest extends Suite {
   import RunStats.Stat

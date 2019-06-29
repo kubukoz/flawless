@@ -3,8 +3,8 @@ package flawless.examples
 import cats.data.NonEmptyList
 import flawless.Suite
 import flawless.SuiteResult
-import cats.implicits._
 import flawless.Tests
+import cats.implicits._
 
 object ExpensiveSuite extends Suite {
   import flawless.syntax._

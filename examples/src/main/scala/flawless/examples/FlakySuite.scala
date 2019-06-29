@@ -1,12 +1,10 @@
 package flawless.examples
 
 import cats.effect.IO
-import flawless.Suite
-import flawless.SuiteResult
+import flawless.{Suite, SuiteResult, Tests}
 
 import scala.util.Random
 import cats.implicits._
-import flawless.Tests
 
 object FlakySuite extends Suite {
   import flawless.syntax._

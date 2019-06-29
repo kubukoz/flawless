@@ -1,78 +1,57 @@
 package flawless
 
-import cats.implicits._
-import cats.effect.IO
+import cats.data.NonEmptyChain
 import cats.data.NonEmptyList
-import cats.kernel.Semigroup
-import flawless.stats.Location
-import cats.Parallel
-import cats.NonEmptyTraverse
-import cats.Applicative
-import cats.Functor
+import cats.effect.IO
 import cats.effect.Resource
+import cats.implicits._
+import cats.kernel.Semigroup
+import cats.Functor
+import cats.Id
 import cats.NonEmptyParallel
+import cats.NonEmptyTraverse
+import cats.Parallel
+import cats.Show
+import flawless.data.low.TestAlg
+import flawless.data.low.TestAlg.LiftResource
+import flawless.data.low.TestAlg.Merge
+import flawless.data.low.TestAlg.Run
+import flawless.fixpoint.HFix
+import flawless.stats.Location
 
-sealed trait Tests[A] {
-  def interpret: IO[A]
-  def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A]
-  final def liftA[F[_]: Applicative]: Tests[F[A]] = this.map(_.pure[F])
+final class Tests[A] private[flawless] (private[flawless] val tree: HFix[TestAlg, A]) {
+  def interpret: IO[A] = HFix.hCata(tree)(TestAlg.algebras.interpret)
+  def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A] = HFix.hCata(tree)(TestAlg.algebras.visitRun(v))
 
+  def debugRun: IO[String] = HFix.hCata(tree)(TestAlg.algebras.show)
 }
 
 object Tests {
-  import structure._
+  def liftIO(result: IO[SuiteResult]): Tests[SuiteResult] = new Tests(HFix[TestAlg, SuiteResult](Run(result)))
+  def liftResource[A, B](tests: Resource[IO, A])(f: A => Tests[B]): Tests[B] = new Tests(HFix(LiftResource(tests, f.map(_.tree))))
 
-  def liftIO(result: IO[SuiteResult]): Tests[SuiteResult] = new Run(result) {}
-  def liftResource[A, B](tests: Resource[IO, A])(f: A => Tests[B]): Tests[B] = new LiftResource(tests, f) {}
+  def parSequence[S[_]: NonEmptyTraverse, A](suites: S[Tests[A]])(implicit nep: NonEmptyParallel[IO, IO.Par]): Tests[S[A]] =
+    new Tests(HFix(Merge[TestAlg.HFixed, S, S, A](suites.map(_.tree), Parallel.parNonEmptySequence(_), Functor[S])))
 
-  def parSequence[F[_]: NonEmptyTraverse](
-    suites: F[Tests[SuiteResult]]
-  )(implicit nep: NonEmptyParallel[IO, IO.Par]
-  ): Tests[F[SuiteResult]] =
-    new Sequence[F, SuiteResult](suites, Parallel.parNonEmptySequence(_)) {}
+  def sequence[S[_]: NonEmptyTraverse, A](suites: S[Tests[A]]): Tests[S[A]] =
+    new Tests(HFix(Merge[TestAlg.HFixed, S, S, A](suites.map(_.tree), _.nonEmptySequence, Functor[S])))
 
-  def sequence[F[_]: NonEmptyTraverse](suites: F[Tests[SuiteResult]]): Tests[F[SuiteResult]] =
-    new Sequence[F, SuiteResult](suites, _.nonEmptySequence) {}
+  //todo test
+  implicit def semigroup[F[_], A](implicit A: Semigroup[A]): Semigroup[Tests[A]] =
+    (a, b) => {
+      val alg: TestAlg[TestAlg.HFixed, A] =
+        Merge[TestAlg.HFixed, NonEmptyChain, Id, A](NonEmptyChain(a.tree, b.tree), _.reduce, Functor[NonEmptyChain])
 
-  implicit val testsFunctor: Functor[Tests] = new Functor[Tests] {
-    def map[A, B](fa: Tests[A])(f: A => B): Tests[B] = new structure.Map(fa, f) {}
+      new Tests(
+        HFix[TestAlg, A](alg)
+      )
+    }
+
+  //todo test
+  //todo consider removing (replace with some method of lifting A to an effect like NonEmptyList)
+  implicit val functor: Functor[Tests] = new Functor[Tests] {
+    override def map[A, B](fa: Tests[A])(f: A => B): Tests[B] = new Tests(HFix(TestAlg.Map(fa.tree, f)))
   }
-
-  private[flawless] object structure {
-    sealed abstract case class Run(iotest: IO[SuiteResult]) extends Tests[SuiteResult] {
-      def interpret: IO[SuiteResult] = iotest
-      def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[SuiteResult] = new Run(v(iotest)) {}
-    }
-
-    sealed abstract case class Map[A, B](tests: Tests[A], f: A => B) extends Tests[B] {
-      def interpret: IO[B] = tests.interpret.map(f)
-      def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[B] = new Map(tests.visit(v), f) {}
-    }
-
-    sealed abstract case class LiftResource[A, B](resource: Resource[IO, A], f: A => Tests[B]) extends Tests[B] {
-      def interpret: IO[B] = resource.use(f(_).interpret)
-      def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[B] = new LiftResource[A, B](resource, f(_).visit(v)) {}
-    }
-
-    sealed abstract case class Sequence[F[_], A](
-      tests: F[Tests[A]],
-      merge: (F[IO[A]] => IO[F[A]])
-    )(implicit F: Functor[F])
-      extends Tests[F[A]] {
-
-      def interpret: IO[F[A]] =
-        merge(tests.map(_.interpret))
-
-      def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[F[A]] = new Sequence(tests.map(_.visit(v)), merge) {}
-    }
-
-    sealed abstract case class Both[A: Semigroup](left: Tests[A], right: Tests[A]) extends Tests[A] {
-      def interpret: IO[A] = (left.interpret |+| right.interpret)
-      def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A] = new Both(left.visit(v), right.visit(v)) {}
-    }
-  }
-
-  implicit def semigroup[F[_], A](implicit F: Semigroup[A]): Semigroup[Tests[A]] = new Both(_, _) {}
 }
 
 final case class AssertionFailure(text: String, location: Location)
@@ -110,6 +89,7 @@ final case class SuiteResult(results: NonEmptyList[TestResult]) extends AnyVal {
 
 object SuiteResult {
   implicit val semigroup: Semigroup[SuiteResult] = (a, b) => SuiteResult(a.results |+| b.results)
+  implicit val show: Show[SuiteResult] = Show.fromToString
 }
 
 trait Suite { self =>
