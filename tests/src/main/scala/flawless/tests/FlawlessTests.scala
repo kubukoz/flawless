@@ -4,7 +4,6 @@ import cats.data.NonEmptyList
 import cats.effect.ExitCode
 import cats.effect.IO
 import cats.effect.IOApp
-import flawless.Assertion.Successful
 import flawless._
 
 //test runner for the whole module

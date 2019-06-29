@@ -1,12 +1,10 @@
-import cats.implicits._
-
-import cats.effect.IO
-import cats.effect.ExitCode
 import cats.data.NonEmptyList
+import cats.effect.ExitCode
+import cats.effect.IO
+import cats.implicits._
 import flawless.stats.RunStats
 
 package object flawless {
-  import cats.effect.ContextShift
   import cats.effect.Console.io._
 
   def loadArgs(args: List[String]): IO[Unit] = {
@@ -14,7 +12,7 @@ package object flawless {
     IO.unit
   }
 
-  def runTests(args: List[String])(iotest: Tests[NonEmptyList[SuiteResult]])(implicit cs: ContextShift[IO]) =
+  def runTests(args: List[String])(iotest: Tests[NonEmptyList[SuiteResult]]) =
     loadArgs(args) >> iotest.interpret.flatMap(summarize)
 
   def summarize(specs: NonEmptyList[SuiteResult]): IO[ExitCode] = {

@@ -1,7 +1,5 @@
 package flawless
 
-import cats.data.NonEmptyChain
-import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.Resource
 import cats.implicits._
@@ -12,6 +10,7 @@ import cats.NonEmptyParallel
 import cats.NonEmptyTraverse
 import cats.Parallel
 import cats.Show
+import cats.data.NonEmptyList
 import flawless.data.low.TestAlg
 import flawless.data.low.TestAlg.LiftResource
 import flawless.data.low.TestAlg.Merge
@@ -42,7 +41,7 @@ object Tests {
   implicit def semigroup[F[_], A](implicit A: Semigroup[A]): Semigroup[Tests[A]] =
     (a, b) => {
       val alg: TestAlg[TestAlg.HFixed, A] =
-        Merge[TestAlg.HFixed, NonEmptyChain, Id, A](NonEmptyChain(a.tree, b.tree), _.reduce, Functor[NonEmptyChain])
+        Merge[TestAlg.HFixed, NonEmptyList, Id, A](NonEmptyList.of(a.tree, b.tree), _.reduce, Functor[NonEmptyList])
 
       new Tests(
         HFix[TestAlg, A](alg)
@@ -58,9 +57,11 @@ object Tests {
 
 final case class AssertionFailure(text: String, location: Location)
 
-final case class Assertions(value: NonEmptyList[Assertion])
+final case class Assertions(value: NonEmptyList[Assertion]) extends AnyVal
 
 object Assertions {
+  def apply(first: Assertion, rest: Assertion*): Assertions = Assertions(NonEmptyList.of(first, rest: _*))
+
   implicit val semigroup: Semigroup[Assertions] = (a, b) => Assertions(a.value |+| b.value)
 }
 

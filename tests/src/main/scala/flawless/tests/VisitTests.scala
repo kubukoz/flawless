@@ -14,14 +14,14 @@ object VisitTests extends Suite {
 
   override val runSuite: Tests[SuiteResult] = tests(
     test("doesn't visit pure tests") {
-      val example = pureTest("hello")(Assertions(NonEmptyList.one(Successful)))
+      val example = pureTest("hello")(Assertions(Successful))
 
       example.visit(_ => IO.raiseError(new Throwable("failed"))).interpret.map {
         _.isSuccessful shouldBe true
       }
     },
     test("visits IO tests") {
-      val example = test("hello")(Assertions(NonEmptyList.one(Successful)).pure[IO])
+      val example = test("hello")(Assertions(Successful).pure[IO])
 
       example.visit(_ => IO.raiseError(new Throwable("failed"))).interpret.attempt.map {
         _.isLeft shouldBe true
