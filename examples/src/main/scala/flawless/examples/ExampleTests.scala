@@ -8,7 +8,6 @@ import cats.effect.IO
 import cats.effect.IOApp
 import cats.implicits._
 import flawless._
-
 import flawless.examples.doobie.DoobieQueryTests
 import _root_.doobie.util.ExecutionContexts
 import _root_.doobie.hikari.HikariTransactor
@@ -17,7 +16,7 @@ import cats.effect.Console.io._
 object ExampleTests extends IOApp {
 
   //flaky test detector
-  def deflake(test: Tests.TTest[SuiteResult]): Tests.TTest[SuiteResult] =
+  def deflake(test: TTest[SuiteResult]): TTest[SuiteResult] =
     test.visit { action =>
       fs2.Stream
         .repeatEval(action)
@@ -60,16 +59,16 @@ object ExampleTests extends IOApp {
   }
 
   val runSequentials = (
-    Tests.parSequence(sequentialTests.map(_.runSuite))
-    // |+| Tests.liftResource(dbTests)(Tests.parSequence(_))
+    TTest.parSequence(sequentialTests.map(_.runSuite))
+      |+| TTest.liftResource(dbTests)(TTest.parSequence(_))
   )
 
-  val runFlaky = Tests.sequence(NonEmptyList.one(deflake(FlakySuite.runSuite)))
+  val runFlaky = TTest.sequence(NonEmptyList.one(deflake(FlakySuite.runSuite)))
 
   val runExpensives =
-    Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
+    TTest.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
 
-  val runParallels = Tests.parSequence(parallelTests.map(_.runSuite))
+  val runParallels = TTest.parSequence(parallelTests.map(_.runSuite))
 
   val testRange = runFlaky |+| runExpensives |+| runParallels |+| runSequentials
 
