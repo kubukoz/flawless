@@ -10,17 +10,16 @@
 
 - Great UX
   - Readable, instantaneous output ❌ with colors ✅, pretty printing ✅ (custom typeclass defaulting to cats.Show impl? ❌), file paths ✅
-  - Considered: running effectless tests in parallel at all times ⁉️
 
 - Ran as an app and not using a test runner ✅
   - works with fury by default ✅
   - could be adapted to sbt's if need be ✅
 
 - Future: extensibility
-  - handle tests as values ✅, inspect them ❌
+  - handle tests as values ✅, inspect them ✅
   - maybe add retries, timeouts, fallbacks on assertions from the outside...
   - plugins as wrappers over tests, e.g. flaky test finding etc...
 
-- Configuration through command-line parameters (?) or config files
+- Configuration through command-line parameters (?)
   - only
   - except
