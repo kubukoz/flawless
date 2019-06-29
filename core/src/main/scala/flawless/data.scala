@@ -16,6 +16,7 @@ import flawless.data.low.TestAlg
 import flawless.data.low.TestAlg.LiftResource
 import flawless.data.low.TestAlg.Merge
 import flawless.data.low.TestAlg.Run
+import flawless.data.low.TestAlg.Pure
 import flawless.fixpoint.HFix
 import flawless.stats.Location
 
@@ -27,6 +28,7 @@ final class Tests[A] private[flawless] (private[flawless] val tree: HFix[TestAlg
 }
 
 object Tests {
+  def pure(result: SuiteResult): Tests[SuiteResult] = new Tests(HFix[TestAlg, SuiteResult](Pure(result)))
   def liftIO(result: IO[SuiteResult]): Tests[SuiteResult] = new Tests(HFix[TestAlg, SuiteResult](Run(result)))
   def liftResource[A, B](tests: Resource[IO, A])(f: A => Tests[B]): Tests[B] = new Tests(HFix(LiftResource(tests, f.map(_.tree))))
 

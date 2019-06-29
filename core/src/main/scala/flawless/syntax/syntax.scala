@@ -5,7 +5,8 @@ import cats.Show
 import cats.implicits._
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.kernel.{Eq, Semigroup}
+import cats.kernel.Eq
+import cats.kernel.Semigroup
 import flawless.stats.Location
 
 package object syntax {
@@ -13,8 +14,8 @@ package object syntax {
   def test(name: String)(ftest: IO[Assertions]): Tests[SuiteResult] =
     Tests.liftIO(ftest.map(toResult(name, _)))
 
-  def pureTest(name: String): Assertions => Tests[SuiteResult] =
-    a => test(name)(IO.pure(a))
+  def pureTest(name: String)(assertions: Assertions): Tests[SuiteResult] =
+    Tests.pure(toResult(name, assertions))
 
   def lazyTest(name: String)(assertions: => Assertions): Tests[SuiteResult] =
     test(name)(IO.eval(Eval.later(assertions)))
