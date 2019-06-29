@@ -9,30 +9,30 @@ import cats.Semigroup
 import cats.data.NonEmptyChain
 import cats.~>
 import flawless.SuiteResult
-import flawless.TTest
+import flawless.Tests
 import flawless.fixpoint.HFix
 import flawless.fixpoint.HFunctor
 import flawless.fixpoint.algebra
 import flawless.fixpoint.algebra.HAlgebra
 
-sealed trait Tests[+F[_], A] extends Product with Serializable
+sealed trait TestAlg[+F[_], A] extends Product with Serializable
 
-object Tests {
-  type HFixed[A] = HFix[Tests, A]
+object TestAlg {
+  type HFixed[A] = HFix[TestAlg, A]
 
-  final case class Pure(result: SuiteResult) extends Tests[Nothing, SuiteResult]
-  final case class Run(iotest: IO[SuiteResult]) extends Tests[Nothing, SuiteResult]
-  final case class LiftResource[F[_], A, B](resource: Resource[IO, A], f: A => F[B]) extends Tests[F, B]
+  final case class Pure(result: SuiteResult) extends TestAlg[Nothing, SuiteResult]
+  final case class Run(iotest: IO[SuiteResult]) extends TestAlg[Nothing, SuiteResult]
+  final case class LiftResource[F[_], A, B](resource: Resource[IO, A], f: A => F[B]) extends TestAlg[F, B]
   //todo merge these two? add new type parameter to sequence and rename it to merge
-  final case class Merge[F[_], A](tests: NonEmptyChain[F[A]], sem: Semigroup[A]) extends Tests[F, A]
-  final case class Sequence[F[_], S[_], A](tests: S[F[A]], merge: S[IO[A]] => IO[S[A]], functor: Functor[S]) extends Tests[F, S[A]]
-  final case class Map[F[_], A, B](test: F[A], f: A => B) extends Tests[F, B]
+  final case class Merge[F[_], A](tests: NonEmptyChain[F[A]], sem: Semigroup[A]) extends TestAlg[F, A]
+  final case class Sequence[F[_], S[_], A](tests: S[F[A]], merge: S[IO[A]] => IO[S[A]], functor: Functor[S]) extends TestAlg[F, S[A]]
+  final case class Map[F[_], A, B](test: F[A], f: A => B) extends TestAlg[F, B]
 
   object algebras {
 
-    val interpret: HAlgebra[Tests, IO] = new HAlgebra[Tests, IO] {
+    val interpret: HAlgebra[TestAlg, IO] = new HAlgebra[TestAlg, IO] {
 
-      def apply[A](fa: Tests[IO, A]): IO[A] = fa match {
+      def apply[A](fa: TestAlg[IO, A]): IO[A] = fa match {
         case Pure(result)                             => IO.pure(result)
         case Run(io)                                  => io
         case m: Map[IO, a, A]                         => m.test.map(m.f)
@@ -42,20 +42,20 @@ object Tests {
       }
     }
 
-    def visitRun(mod: IO[SuiteResult] => IO[SuiteResult]): HAlgebra[Tests, TTest] =
-      new algebra.HAlgebra[Tests, TTest] {
+    def visitRun(mod: IO[SuiteResult] => IO[SuiteResult]): HAlgebra[TestAlg, Tests] =
+      new algebra.HAlgebra[TestAlg, Tests] {
 
-        def apply[A](fa: Tests[TTest, A]): TTest[A] = fa match {
-          case Run(io) => new TTest(HFix[Tests, A](Run(mod(io))))
-          case e       => new TTest(HFix[Tests, A](testsFunctorK[A].mapK(e)(λ[TTest ~> HFixed](_.tree))))
+        def apply[A](fa: TestAlg[Tests, A]): Tests[A] = fa match {
+          case Run(io) => new Tests(HFix[TestAlg, A](Run(mod(io))))
+          case e       => new Tests(HFix[TestAlg, A](testsFunctorK[A].mapK(e)(λ[Tests ~> HFixed](_.tree))))
         }
       }
 
     type IOString[_] = IO[String]
 
-    val show: algebra.HAlgebra[Tests, IOString] = new algebra.HAlgebra[Tests, IOString] {
+    val show: algebra.HAlgebra[TestAlg, IOString] = new algebra.HAlgebra[TestAlg, IOString] {
 
-      def apply[A](fa: Tests[IOString, A]): IO[String] = fa match {
+      def apply[A](fa: TestAlg[IOString, A]): IO[String] = fa match {
         case Pure(result) => show"result($result)".pure[IO]
         case Run(test)    => test.map(result => show"Run($result)")
         case Merge(elems, _) =>
@@ -72,9 +72,9 @@ object Tests {
     }
   }
 
-  implicit def testsFunctorK[A]: FunctorK[Tests[?[_], A]] = new FunctorK[Tests[?[_], A]] {
+  implicit def testsFunctorK[A]: FunctorK[TestAlg[?[_], A]] = new FunctorK[TestAlg[?[_], A]] {
 
-    def mapK[F[_], G[_]](af: Tests[F, A])(fk: F ~> G): Tests[G, A] = af match {
+    def mapK[F[_], G[_]](af: TestAlg[F, A])(fk: F ~> G): TestAlg[G, A] = af match {
       case p: Pure                  => p
       case r: Run                   => r
       case m: Map[F, a, A]          => Map(fk(m.test), m.f)
@@ -84,10 +84,10 @@ object Tests {
     }
   }
 
-  implicit val testsHFunctor: HFunctor[Tests] = new HFunctor[Tests] {
+  implicit val testsHFunctor: HFunctor[TestAlg] = new HFunctor[TestAlg] {
 
-    def hmap[G[_], I[_]](nt: G ~> I): Tests[G, ?] ~> Tests[I, ?] = new (Tests[G, ?] ~> Tests[I, ?]) {
-      def apply[A](fa: Tests[G, A]): Tests[I, A] = testsFunctorK[A].mapK(fa)(nt)
+    def hmap[G[_], I[_]](nt: G ~> I): TestAlg[G, ?] ~> TestAlg[I, ?] = new (TestAlg[G, ?] ~> TestAlg[I, ?]) {
+      def apply[A](fa: TestAlg[G, A]): TestAlg[I, A] = testsFunctorK[A].mapK(fa)(nt)
     }
   }
 }

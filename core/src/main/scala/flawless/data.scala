@@ -11,36 +11,37 @@ import cats.effect.IO
 import cats.effect.Resource
 import cats.implicits._
 import cats.kernel.Semigroup
-import flawless.data.low.Tests
-import flawless.data.low.Tests.Merge
-import flawless.data.low.Tests.LiftResource
-import flawless.data.low.Tests.Run
-import flawless.data.low.Tests.Sequence
+import flawless.data.low.TestAlg
+import flawless.data.low.TestAlg.Merge
+import flawless.data.low.TestAlg.LiftResource
+import flawless.data.low.TestAlg.Run
+import flawless.data.low.TestAlg.Sequence
 import flawless.fixpoint.HFix
 import flawless.stats.Location
 
-final class TTest[A] private[flawless] (private[flawless] val tree: HFix[Tests, A]) {
-  def interpret: IO[A] = HFix.hCata(tree)(Tests.algebras.interpret)
-  def visit(v: IO[SuiteResult] => IO[SuiteResult]): TTest[A] = HFix.hCata(tree)(Tests.algebras.visitRun(v))
+final class Tests[A] private[flawless](private[flawless] val tree: HFix[TestAlg, A]) {
+  def interpret: IO[A] = HFix.hCata(tree)(TestAlg.algebras.interpret)
+  def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A] = HFix.hCata(tree)(TestAlg.algebras.visitRun(v))
 
-  def debugRun: IO[String] = HFix.hCata(tree)(Tests.algebras.show)
+  def debugRun: IO[String] = HFix.hCata(tree)(TestAlg.algebras.show)
 }
 
-object TTest {
-  def liftIO(result: IO[SuiteResult]): TTest[SuiteResult] = new TTest(HFix[Tests, SuiteResult](Run(result)))
-  def liftResource[A, B](tests: Resource[IO, A])(f: A => TTest[B]): TTest[B] = new TTest(HFix(LiftResource(tests, f.map(_.tree))))
+object Tests {
+  def liftIO(result: IO[SuiteResult]): Tests[SuiteResult] = new Tests(HFix[TestAlg, SuiteResult](Run(result)))
+  def liftResource[A, B](tests: Resource[IO, A])(f: A => Tests[B]): Tests[B] = new Tests(HFix(LiftResource(tests, f.map(_.tree))))
 
-  def parSequence[S[_]: NonEmptyTraverse, A](suites: S[TTest[A]])(implicit nep: NonEmptyParallel[IO, IO.Par]): TTest[S[A]] =
-    new TTest(HFix(Sequence[Tests.HFixed, S, A](suites.map(_.tree), Parallel.parNonEmptySequence(_), Functor[S])))
+  def parSequence[S[_]: NonEmptyTraverse, A](suites: S[Tests[A]])(implicit nep: NonEmptyParallel[IO, IO.Par]): Tests[S[A]] =
+    new Tests(HFix(Sequence[TestAlg.HFixed, S, A](suites.map(_.tree), Parallel.parNonEmptySequence(_), Functor[S])))
 
-  def sequence[S[_]: NonEmptyTraverse, A](suites: S[TTest[A]]): TTest[S[A]] =
-    new TTest(HFix(Sequence[Tests.HFixed, S, A](suites.map(_.tree), _.nonEmptySequence, Functor[S])))
+  def sequence[S[_]: NonEmptyTraverse, A](suites: S[Tests[A]]): Tests[S[A]] =
+    new Tests(HFix(Sequence[TestAlg.HFixed, S, A](suites.map(_.tree), _.nonEmptySequence, Functor[S])))
 
-  implicit def semigroup[F[_], A](implicit A: Semigroup[A]): Semigroup[TTest[A]] =
-    (a, b) => new TTest(HFix[Tests, A](Merge(NonEmptyChain(a.tree, b.tree), A)))
+  //todo test
+  implicit def semigroup[F[_], A](implicit A: Semigroup[A]): Semigroup[Tests[A]] =
+    (a, b) => new Tests(HFix[TestAlg, A](Merge(NonEmptyChain(a.tree, b.tree), A)))
 
-  implicit val functor: Functor[TTest] = new Functor[TTest] {
-    override def map[A, B](fa: TTest[A])(f: A => B): TTest[B] = new TTest(HFix(Tests.Map(fa.tree, f)))
+  implicit val functor: Functor[Tests] = new Functor[Tests] {
+    override def map[A, B](fa: Tests[A])(f: A => B): Tests[B] = new Tests(HFix(TestAlg.Map(fa.tree, f)))
   }
 }
 
@@ -83,5 +84,5 @@ object SuiteResult {
 }
 
 trait Suite { self =>
-  def runSuite: TTest[SuiteResult]
+  def runSuite: Tests[SuiteResult]
 }
