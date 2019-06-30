@@ -45,7 +45,7 @@ package object syntax {
             )
           )
 
-      Assertions(NonEmptyList.one(assertion))
+      Assertions(assertion)
     }
   }
 }
