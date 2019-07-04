@@ -48,4 +48,13 @@ package object syntax {
       Assertions(assertion)
     }
   }
+
+  /**
+    * Import this if you don't give a damn.
+    * Default instances of type classes that allow you to write some tests quicker.
+    */
+  object idgaf {
+    implicit def anyEq[T]: Eq[T] = Eq.fromUniversalEquals
+    implicit def anyShow[T]: Show[T] = Show.fromToString
+  }
 }
