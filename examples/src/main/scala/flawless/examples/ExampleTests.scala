@@ -12,24 +12,39 @@ import flawless.examples.doobie.DoobieQueryTests
 import _root_.doobie.util.ExecutionContexts
 import _root_.doobie.hikari.HikariTransactor
 import cats.effect.Console.io._
+import fs2.Pipe
+import cats.data.OptionT
 
 object ExampleTests extends IOApp {
 
   //flaky test detector
-  def deflake(test: Tests[SuiteResult]): Tests[SuiteResult] =
-    test.visit { action =>
-      fs2.Stream
-        .repeatEval(action)
+  def deflake(maxRetries: Option[Long] = Some(10000L)): IO[SuiteResult] => IO[SuiteResult] =
+    io => {
+      def counted[A]: Pipe[IO, A, A] = maxRetries match {
+        case Some(max) => _.take(max)
+        case None      => identity
+      }
+
+      val findFirstFailure = fs2.Stream
+        .repeatEval(io)
+        .through(counted)
         .zipWithIndex
         .find {
           case (suite, _) => suite.isFailed
         }
-        .evalMap {
-          case (failure, failureIndex) =>
-            putStrLn(show"Suite failed after ${failureIndex + 1} successes").as(failure)
-        }
         .compile
-        .lastOrError
+        .last
+        .flatMap {
+          case Some((failure, failureIndex)) =>
+            putStrLn(show"Suite failed after ${failureIndex + 1} successes").as(failure.some)
+          case None =>
+            putStrLn(show"Didn't find flaky suite after $maxRetries successes").as(none)
+        }
+
+      io.flatMap { firstResult =>
+        if (!firstResult.isSuccessful) firstResult.pure[IO]
+        else OptionT(findFirstFailure).getOrElse(firstResult)
+      }
     }
 
   val sequentialTests = NonEmptyList.of(
@@ -60,10 +75,10 @@ object ExampleTests extends IOApp {
 
   val runSequentials = (
     Tests.parSequence(sequentialTests.map(_.runSuite))
-      |+| Tests.liftResource(dbTests)(Tests.parSequence(_)).combineN(2)
+      |+| Tests.resource(dbTests).use(Tests.parSequence(_)).combineN(2)
   )
 
-  val runFlaky = deflake(FlakySuite.runSuite).map(NonEmptyList.one)
+  val runFlaky = FlakySuite.runSuite.map(NonEmptyList.one)
 
   val runExpensives =
     Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
@@ -75,7 +90,7 @@ object ExampleTests extends IOApp {
   import cats.effect.Console.io._
   override def run(args: List[String]): IO[ExitCode] =
     runTests(args)(
-      testRange
+      testRange.visit(deflake())
     )
 //    testRange.debugRun.flatMap(putStrLn(_)).as(ExitCode.Success)
 }
