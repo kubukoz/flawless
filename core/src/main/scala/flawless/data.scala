@@ -18,10 +18,13 @@ import flawless.data.low.TestAlg.Run
 import flawless.data.low.TestAlg.Pure
 import flawless.fixpoint.HFix
 import flawless.stats.Location
+import cats.Applicative
 
 final class Tests[A] private[flawless] (private[flawless] val tree: HFix[TestAlg, A]) {
   def interpret: IO[A] = HFix.hCata(tree)(TestAlg.algebras.interpret)
   def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A] = HFix.hCata(tree)(TestAlg.algebras.visitRun(v))
+
+  def mapLift[F[_]: Applicative]: Tests[F[A]] = this.map(_.pure[F])
 
   def debugRun: IO[String] = HFix.hCata(tree)(TestAlg.algebras.show)
 }
@@ -54,7 +57,6 @@ object Tests {
     }
 
   //todo test
-  //todo consider removing (replace with some method of lifting A to an effect like NonEmptyList)
   implicit val functor: Functor[Tests] = new Functor[Tests] {
     override def map[A, B](fa: Tests[A])(f: A => B): Tests[B] = new Tests(HFix(TestAlg.Map(fa.tree, f)))
   }

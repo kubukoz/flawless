@@ -87,10 +87,8 @@ object ExampleTests extends IOApp {
 
   val testRange = runFlaky |+| runExpensives |+| runParallels |+| runSequentials
 
-  import cats.effect.Console.io._
   override def run(args: List[String]): IO[ExitCode] =
     runTests(args)(
       testRange.visit(deflake())
     )
-//    testRange.debugRun.flatMap(putStrLn(_)).as(ExitCode.Success)
 }
