@@ -27,7 +27,7 @@ val commonSettings = Seq(
   libraryDependencies ++= List(
     "org.typelevel" %% "cats-tagless-core" % "0.8",
     "com.github.julien-truffaut" %% "monocle-macro" % "1.5.1-cats",
-    "org.typelevel" %% "cats-effect" % "1.3.1",
+    "org.typelevel" %% "cats-effect" % "1.4.0",
     "dev.profunktor" %% "console4cats" % "0.7.0",
     "com.lihaoyi" %% "sourcecode" % "0.1.7"
   ) ++ compilerPlugins
