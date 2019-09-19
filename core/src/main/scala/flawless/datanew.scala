@@ -19,6 +19,8 @@ import cats.NonEmptyTraverse
 import flawless.data.neu.Assertion.Successful
 import flawless.data.neu.Assertion.Failed
 import cats.Defer
+import cats.Eval
+import flawless.data.neu.TestRun.Pure
 
 sealed trait Assertion extends Product with Serializable
 
@@ -54,9 +56,17 @@ trait Interpreter[F[_]] {
 }
 
 object Interpreter {
-  implicit def applyInterpreter[F[_]: Apply]: Interpreter[F] = new Interpreter[F] {
+  implicit def applyInterpreter[F[_]: Applicative]: Interpreter[F] = new Interpreter[F] {
     //todo tests in a suite should have multiple methods of traversal
-    private val interpretTest: Test[F] => F[Test[Id]] = test => test.result.map(r => Test[Id](test.name, r))
+    private val interpretTest: Test[F] => F[Test[Id]] = test => {
+      def finish(results: NonEmptyList[Assertion]): Test[Id] = Test(test.name, TestRun.Pure(results))
+
+      test.result match {
+        case TestRun.Eval(effect) => effect.map(finish)
+        case TestRun.Pure(result) => finish(result).pure[F]
+        case TestRun.Lazy(e)      => e.map(finish).value.pure[F]
+      }
+    }
 
     private val interpretSuite: Suite[F] => F[Suite[Id]] = suite =>
       suite.tests.nonEmptyTraverse(interpretTest).map(Suite[Id](suite.name, _))
@@ -111,7 +121,15 @@ final case class Suite[F[_]](name: String, tests: NonEmptyList[Test[F]]) {
   def via(f: Test[F] => Test[F]): Suite[F] = Suite(name, tests.map(f))
 }
 
-final case class Test[F[_]](name: String, result: F[NonEmptyList[Assertion]])
+final case class Test[F[_]](name: String, result: TestRun[F])
+
+sealed trait TestRun[F[_]] extends Product with Serializable
+
+object TestRun {
+  final case class Eval[F[_]](effect: F[NonEmptyList[Assertion]]) extends TestRun[F]
+  final case class Pure[F[_]](result: NonEmptyList[Assertion]) extends TestRun[F]
+  final case class Lazy[F[_]](result: cats.Eval[NonEmptyList[Assertion]]) extends TestRun[F]
+}
 
 object dsl {
   //This name is bad (Predicate implies A => Boolean). Come up with a better name.
@@ -124,19 +142,21 @@ object dsl {
     NonEmptyList(firstTest, rest.toList).reduce
 
   def test[F[_]](name: String)(assertions: F[NonEmptyList[Assertion]]): NonEmptyList[Test[F]] =
-    NonEmptyList.one(Test(name, assertions))
+    NonEmptyList.one(Test(name, TestRun.Eval(assertions)))
 
   //todo add node to test tree to distinguish pure tests
   //todo better type inference? Eval by default?
-  def pureTest[F[_]: Applicative](name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
-    NonEmptyList.one(Test(name, assertions.pure[F]))
+  def pureTest[F[_]](name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
+    NonEmptyList.one(Test(name, TestRun.Pure(assertions)))
 
-  def lazyTest[F[_]: Defer: Applicative](name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
-    NonEmptyList.one(Test(name, Defer[F].defer(assertions.pure[F])))
+  def lazyTest[F[_]](name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
+    NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions))))
 
   def assertion(cond: Boolean, ifFalse: String): NonEmptyList[Assertion] = ensure(cond, predicates.all.isTrue(ifFalse))
 
   def ensure[A](value: A, predicate: Predicate[A]): NonEmptyList[Assertion] = NonEmptyList.one(predicate(value))
+
+  def failed[F[_]](name: String): NonEmptyList[Test[F]] = pureTest(name)(NonEmptyList.one(Assertion.Failed("Failed")))
 }
 
 object predicates {
@@ -183,7 +203,7 @@ class NeuExample[F[_]: Timer: Applicative: Defer] {
       },
       lazyTest[F]("lazy test") {
         ensure(5, equalTo(4))
-      }
+      }.combineN(5)
     )
   }
 }
@@ -202,9 +222,9 @@ object Run extends IOApp {
         )
       )
 
-    tests.interpret.flatMap { p =>
-      IO(println(tests)) *>
-        IO(println(p))
+    tests.viaTest(_ => dsl.failed[IO]("Oh no!").head).interpret.flatMap { p =>
+      // IO(println(tests)) *>
+      IO(println(p))
     }
   }.as(ExitCode.Success)
 }
