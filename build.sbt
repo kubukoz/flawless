@@ -16,7 +16,7 @@ inThisBuild(
 
 val compilerPlugins = List(
   compilerPlugin("org.scalamacros" % "paradise" % "2.1.1").cross(CrossVersion.full),
-  compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.10"),
+  compilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3"),
   compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 )
 
@@ -25,10 +25,10 @@ val commonSettings = Seq(
   scalacOptions ++= Options.all,
   name := "flawless",
   libraryDependencies ++= List(
-    "org.typelevel" %% "cats-tagless-core" % "0.8",
-    "com.github.julien-truffaut" %% "monocle-macro" % "1.5.1-cats",
-    "org.typelevel" %% "cats-effect" % "1.4.0",
-    "dev.profunktor" %% "console4cats" % "0.7.0",
+    "org.typelevel" %% "cats-tagless-core" % "0.5",
+    "com.github.julien-truffaut" %% "monocle-macro" % "2.0.0",
+    "org.typelevel" %% "cats-effect" % "2.0.0",
+    "dev.profunktor" %% "console4cats" % "0.8.0",
     "com.lihaoyi" %% "sourcecode" % "0.1.7"
   ) ++ compilerPlugins
 )
@@ -49,7 +49,7 @@ val examples =
     .settings(
       commonSettings,
       libraryDependencies ++= List(
-        "org.tpolecat" %% "doobie-hikari" % "0.7.0",
+        "org.tpolecat" %% "doobie-hikari" % "0.8.2",
         "org.postgresql" % "postgresql" % "42.2.6"
       )
     )

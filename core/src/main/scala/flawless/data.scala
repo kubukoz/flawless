@@ -39,7 +39,7 @@ object Tests {
     def use[B](f: A => Tests[B]): Tests[B] = new Tests(HFix(LiftResource(resource, f.map(_.tree))))
   }
 
-  def parSequence[S[_]: NonEmptyTraverse, A](suites: S[Tests[A]])(implicit nep: NonEmptyParallel[IO, IO.Par]): Tests[S[A]] =
+  def parSequence[S[_]: NonEmptyTraverse, A](suites: S[Tests[A]])(implicit nep: NonEmptyParallel[IO]): Tests[S[A]] =
     new Tests(HFix(Merge[TestAlg.HFixed, S, S, A](suites.map(_.tree), Parallel.parNonEmptySequence(_), Functor[S])))
 
   def sequence[S[_]: NonEmptyTraverse, A](suites: S[Tests[A]]): Tests[S[A]] =

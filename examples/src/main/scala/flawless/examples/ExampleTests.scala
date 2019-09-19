@@ -14,6 +14,7 @@ import _root_.doobie.hikari.HikariTransactor
 import cats.effect.Console.io._
 import fs2.Pipe
 import cats.data.OptionT
+import cats.effect.Blocker
 
 object ExampleTests extends IOApp {
   import flawless.syntax._
@@ -61,15 +62,15 @@ object ExampleTests extends IOApp {
 
   val dbTests = {
     for {
-      connectEc  <- ExecutionContexts.fixedThreadPool[IO](10)
-      transactEc <- ExecutionContexts.cachedThreadPool[IO]
+      connectEc <- ExecutionContexts.fixedThreadPool[IO](10)
+      blocker   <- Blocker[IO]
       transactor <- HikariTransactor.newHikariTransactor[IO](
         "org.postgresql.Driver",
         "jdbc:postgresql://localhost:5432/postgres",
         "postgres",
         "postgres",
         connectEc,
-        transactEc
+        blocker
       )
     } yield NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor).runSuite))
   }
