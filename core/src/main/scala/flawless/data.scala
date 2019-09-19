@@ -22,7 +22,7 @@ import cats.Applicative
 
 final class Tests[A] private[flawless] (private[flawless] val tree: HFix[TestAlg, A]) {
   def interpret: IO[A] = HFix.hCata(tree)(TestAlg.algebras.interpret)
-  def visit(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A] = HFix.hCata(tree)(TestAlg.algebras.visitRun(v))
+  def via(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A] = HFix.hCata(tree)(TestAlg.algebras.visitRun(v))
 
   def mapLift[F[_]: Applicative]: Tests[F[A]] = this.map(_.pure[F])
 
@@ -102,6 +102,6 @@ object SuiteResult {
   implicit val show: Show[SuiteResult] = Show.fromToString
 }
 
-trait Suite { self =>
+trait Suite {
   def runSuite: Tests[SuiteResult]
 }

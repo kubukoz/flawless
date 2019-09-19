@@ -17,14 +17,14 @@ object VisitTests extends Suite {
     test("doesn't visit pure tests") {
       val example = pureTest("hello")(Assertions(Successful))
 
-      example.visit(_ => IO.raiseError(new Throwable("failed"))).interpret.map {
+      example.via(_ => IO.raiseError(new Throwable("failed"))).interpret.map {
         _.isSuccessful shouldBe true
       }
     },
     test("visits IO tests") {
       val example = test("hello")(Assertions(Successful).pure[IO])
 
-      example.visit(_ => IO.raiseError(new Throwable("failed"))).interpret.attempt.map {
+      example.via(_ => IO.raiseError(new Throwable("failed"))).interpret.attempt.map {
         _.isLeft shouldBe true
       }
     },
@@ -36,7 +36,7 @@ object VisitTests extends Suite {
         val example =
           Tests.sequence(NonEmptyList.of(test("hello")(baseIO.map(_ => 1 shouldBe 1)), test("hello2")(baseIO.map(_ => 1 shouldBe 1))))
 
-        example.visit(b => secondIO *> b).interpret *> ref.get.map { log =>
+        example.via(b => secondIO *> b).interpret *> ref.get.map { log =>
           (log.size shouldBe 4) |+| (log shouldBe List("foo", "boo", "foo", "boo"))
         }
       }

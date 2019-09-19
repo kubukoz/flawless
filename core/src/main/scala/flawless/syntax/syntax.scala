@@ -57,4 +57,19 @@ package object syntax {
     implicit def anyEq[T]: Eq[T] = Eq.fromUniversalEquals
     implicit def anyShow[T]: Show[T] = Show.fromToString
   }
+
+  object modifiers {
+
+    def catching(implicit file: sourcecode.File, line: sourcecode.Line): IO[SuiteResult] => IO[SuiteResult] = _.recover {
+      case e =>
+        SuiteResult(
+          NonEmptyList.one(
+            TestResult(
+              "Failed",
+              Assertions(Assertion.Failed(AssertionFailure("An exception was thrown: " + e, Location(file.value, line.value))))
+            )
+          )
+        )
+    }
+  }
 }

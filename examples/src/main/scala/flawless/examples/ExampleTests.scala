@@ -16,6 +16,7 @@ import fs2.Pipe
 import cats.data.OptionT
 
 object ExampleTests extends IOApp {
+  import flawless.syntax._
 
   //flaky test detector
   def deflake(maxRetries: Option[Long] = Some(10000L)): IO[SuiteResult] => IO[SuiteResult] =
@@ -89,6 +90,6 @@ object ExampleTests extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] =
     runTests(args)(
-      testRange.visit(deflake())
+      testRange.via(deflake()).via(modifiers.catching)
     )
 }

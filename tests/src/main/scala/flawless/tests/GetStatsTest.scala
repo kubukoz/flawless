@@ -12,7 +12,6 @@ object GetStatsTest extends Suite {
   val runSuite: Tests[SuiteResult] = {
     tests(
       test("1 test: 1 succ / 0 fail") {
-
         pureTest("Example") {
           1 shouldBe 1
         }.interpret.map { input =>
