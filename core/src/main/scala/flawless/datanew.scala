@@ -45,7 +45,7 @@ object Suites {
 
   def lift[F[_]: Applicative](suite: Suite[F]): Suites[F] = One(suite)
 
-  def parallel[F[_]: Apply, G[_]](first: Suites[F], rest: Suites[F]*)(implicit nep: NonEmptyParallel[F]): Suites[F] =
+  def parallel[F[_]: NonEmptyParallel, G[_]](first: Suites[F], rest: Suites[F]*): Suites[F] =
     Sequence[F](NonEmptyList(first, rest.toList), λ[(NonEmptyList Comp F)#L ~> (F Comp NonEmptyList)#L](Parallel.parNonEmptySequence(_)))
 
   def sequential[F[_]: Apply](first: Suites[F], rest: Suites[F]*): Suites[F] =
