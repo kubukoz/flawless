@@ -2,7 +2,6 @@ package flawless.data.neu
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.Eval
 import cats.effect.Timer
 import cats.effect.IOApp
 import cats.effect.ExitCode
@@ -19,6 +18,7 @@ import com.softwaremill.diffx._
 import cats.NonEmptyTraverse
 import flawless.data.neu.Assertion.Successful
 import flawless.data.neu.Assertion.Failed
+import cats.Defer
 
 sealed trait Assertion extends Product with Serializable
 
@@ -123,13 +123,16 @@ object dsl {
   def tests[F[_]](firstTest: NonEmptyList[Test[F]], rest: NonEmptyList[Test[F]]*): NonEmptyList[Test[F]] =
     NonEmptyList(firstTest, rest.toList).reduce
 
-  def test(name: String)(assertions: IO[NonEmptyList[Assertion]]): NonEmptyList[Test[IO]] = NonEmptyList.one(Test(name, assertions))
+  def test[F[_]](name: String)(assertions: F[NonEmptyList[Assertion]]): NonEmptyList[Test[F]] =
+    NonEmptyList.one(Test(name, assertions))
 
-  def pureTest(name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[IO]] =
-    NonEmptyList.one(Test(name, IO.pure(assertions)))
+  //todo add node to test tree to distinguish pure tests
+  //todo better type inference? Eval by default?
+  def pureTest[F[_]: Applicative](name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
+    NonEmptyList.one(Test(name, assertions.pure[F]))
 
-  def lazyTest(name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[IO]] =
-    NonEmptyList.one(Test(name, IO.eval(Eval.later(assertions))))
+  def lazyTest[F[_]: Defer: Applicative](name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
+    NonEmptyList.one(Test(name, Defer[F].defer(assertions.pure[F])))
 
   def assertion(cond: Boolean, ifFalse: String): NonEmptyList[Assertion] = ensure(cond, predicates.all.isTrue(ifFalse))
 
@@ -164,21 +167,21 @@ object predicates {
   }
 }
 
-class NeuExample(implicit timer: Timer[IO]) {
+class NeuExample[F[_]: Timer: Applicative: Defer] {
   import dsl._
   import predicates.all._
   import scala.concurrent.duration._
 
   val content = suite("examples") {
     tests(
-      pureTest("first test") {
+      pureTest[F]("first test") {
         assertion(1 === 0, "1 was not zero") <+>
           ensure(1, greaterThan(5))
       },
-      test("io test") {
-        IO.sleep(500.millis).map(a => assertion(a === (()), "unit was not unit"))
+      test[F]("io test") {
+        Timer[F].sleep(500.millis).map(a => assertion(a === (()), "unit was not unit"))
       },
-      lazyTest("lazy test") {
+      lazyTest[F]("lazy test") {
         ensure(5, equalTo(4))
       }
     )
