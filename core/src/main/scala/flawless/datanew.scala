@@ -15,6 +15,8 @@ import cats.Apply
 import cats.Parallel
 import flawless.data.neu.Suites.Sequence
 import flawless.data.neu.Suites.One
+import cats.Show
+import com.softwaremill.diffx._
 
 sealed trait Assertion extends Product with Serializable
 
@@ -92,11 +94,21 @@ object dsl {
 
 object predicates {
 
-  object all {
+  object all extends DiffInstances {
     import dsl.Predicate
 
     def greaterThan(another: Int): Predicate[Int] =
       a => if (a > another) Assertion.Successful else Assertion.Failed(show"$a was not greater than $another")
+
+    def equalTo[T: Diff: Show](another: T): Predicate[T] = {
+      implicit val showDiff: Show[DiffResult] = _.show
+
+      a =>
+        Diff[T].apply(a, another) match {
+          case diff if diff.isIdentical => Assertion.Successful
+          case diff                     => Assertion.Failed(show"$a was not equal to $another. Diff:\n$diff")
+        }
+    }
   }
 }
 
@@ -115,7 +127,7 @@ class NeuExample(implicit timer: Timer[IO]) {
         IO.sleep(500.millis).map(a => assertion(a === (()), "unit was not unit"))
       },
       lazyTest("lazy test") {
-        assertion(false == false, "false was not false").combineN(2)
+        ensure(5, equalTo(4))
       }
     )
   }
@@ -126,7 +138,7 @@ object Run extends IOApp {
   def run(args: List[String]): IO[ExitCode] = {
     val data = new NeuExample().content
 
-    Suites
+    val tests = Suites
       .parallel(
         Suites.lift(data),
         Suites.sequential(
@@ -134,9 +146,10 @@ object Run extends IOApp {
           Suites.lift(data)
         )
       )
-      .interpret
-      .flatMap { p =>
+
+    tests.interpret.flatMap { p =>
+      IO(println(tests)) *>
         IO(println(p))
-      }
+    }
   }.as(ExitCode.Success)
 }
