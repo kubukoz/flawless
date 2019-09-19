@@ -86,7 +86,7 @@ object Traversal {
 
   // (potentially specialized) implementation of Sequential for Id,
   // which means identity in case of `sequence` and `map` in case of `traverse`.
-  val identity: Traversal[Id] = Sequential(Apply[Id])
+  val identity: Traversal[Id] = sequential
 
   def sequential[F[_]: Apply]: Traversal[F] = Sequential(Apply[F])
   def parallel[F[_]: NonEmptyParallel]: Traversal[F] = Parallel(NonEmptyParallel[F])
@@ -94,7 +94,7 @@ object Traversal {
 
 object Suites {
 
-  def lift[F[_]: Applicative](suite: Suite[F]): Suites[F] = One(suite)
+  def one[F[_]: Applicative](suite: Suite[F]): Suites[F] = One(suite)
 
   def parallel[F[_]: NonEmptyParallel, G[_]](first: Suites[F], rest: Suites[F]*): Suites[F] =
     Sequence[F](NonEmptyList(first, rest.toList), Traversal.parallel)
@@ -114,6 +114,8 @@ final case class Suite[F[_]](name: String, tests: NonEmptyList[Test[F]]) {
 final case class Test[F[_]](name: String, result: F[NonEmptyList[Assertion]])
 
 object dsl {
+  //This name is bad (Predicate implies A => Boolean). Come up with a better name.
+  //Possibly worth newtyping.
   type Predicate[-A] = A => Assertion
 
   def suite[F[_]](name: String)(tests: NonEmptyList[Test[F]]): Suite[F] = new Suite(name, tests)
@@ -190,10 +192,10 @@ object Run extends IOApp {
 
     val tests = Suites
       .parallel(
-        Suites.lift(data),
+        Suites.one(data),
         Suites.sequential(
-          Suites.lift(data),
-          Suites.lift(data)
+          Suites.one(data),
+          Suites.one(data)
         )
       )
 
