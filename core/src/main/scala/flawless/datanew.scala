@@ -19,7 +19,7 @@ import flawless.data.neu.Suites.One
 sealed trait Assertion extends Product with Serializable
 
 object Assertion {
-  case object Successful                   extends Assertion
+  case object Successful extends Assertion
   final case class Failed(message: String) extends Assertion
 }
 
@@ -45,14 +45,14 @@ object Suites {
 
   def lift[F[_]: Applicative](suite: Suite[F]): Suites[F] = One(suite)
 
-  def parallel[F[_]: Apply, G[_]](first: Suites[F], rest: Suites[F]*)(implicit nep: NonEmptyParallel[F, G]): Suites[F] =
+  def parallel[F[_]: Apply, G[_]](first: Suites[F], rest: Suites[F]*)(implicit nep: NonEmptyParallel[F]): Suites[F] =
     Sequence[F](NonEmptyList(first, rest.toList), λ[(NonEmptyList Comp F)#L ~> (F Comp NonEmptyList)#L](Parallel.parNonEmptySequence(_)))
 
   def sequential[F[_]: Apply](first: Suites[F], rest: Suites[F]*): Suites[F] =
     Sequence[F](NonEmptyList(first, rest.toList), λ[(NonEmptyList Comp F)#L ~> (F Comp NonEmptyList)#L](_.nonEmptySequence))
 
   final case class Sequence[F[_]](suites: NonEmptyList[Suites[F]], sequence: (NonEmptyList Comp F)#L ~> (F Comp NonEmptyList)#L)
-      extends Suites[F]
+    extends Suites[F]
 
   final case class One[F[_]](suite: Suite[F]) extends Suites[F]
 
