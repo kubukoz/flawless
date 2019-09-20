@@ -234,7 +234,7 @@ object Run extends IOApp {
   def showResults(testResults: Suites[Id]): String = flatten(testResults).map(showResult).mkString_("Suites: [\n", "\n", "]")
 
   def showResult(suite: Suite[Id]): String =
-    show"${suite.name}:\n" + suite.tests.map(showR).reduceMap(_.lines.toList.map("  " + _)).mkString("\n")
+    show"${suite.name}:\n" + suite.tests.map(showR).reduceMap(_.linesIterator.toList.map("  " + _)).mkString("\n")
 
   def showR(test: Test[Id]): String =
     test.name + ":\n" + (test.result match {
