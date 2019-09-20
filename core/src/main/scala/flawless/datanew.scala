@@ -20,7 +20,6 @@ import flawless.data.neu.Assertion.Successful
 import flawless.data.neu.Assertion.Failed
 import cats.Defer
 import cats.Eval
-import flawless.data.neu.TestRun.Pure
 
 sealed trait Assertion extends Product with Serializable
 
@@ -62,9 +61,10 @@ object Interpreter {
       def finish(results: NonEmptyList[Assertion]): Test[Id] = Test(test.name, TestRun.Pure(results))
 
       test.result match {
-        case TestRun.Eval(effect) => effect.map(finish)
-        case TestRun.Pure(result) => finish(result).pure[F]
-        case TestRun.Lazy(e)      => e.map(finish).value.pure[F]
+        //this is a GADT skolem - you think I'd know what that means by now...
+        case eval: TestRun.Eval[f] => eval.effect.map(finish)
+        case TestRun.Pure(result)  => finish(result).pure[F]
+        case TestRun.Lazy(e)       => e.map(finish).value.pure[F]
       }
     }
 
@@ -121,19 +121,23 @@ final case class Suite[F[_]](name: String, tests: NonEmptyList[Test[F]]) {
   def via(f: Test[F] => Test[F]): Suite[F] = Suite(name, tests.map(f))
 }
 
-final case class Test[F[_]](name: String, result: TestRun[F])
+final case class Test[+F[_]](name: String, result: TestRun[F])
 
-sealed trait TestRun[F[_]] extends Product with Serializable
+sealed trait TestRun[+F[_]] extends Product with Serializable
 
 object TestRun {
   final case class Eval[F[_]](effect: F[NonEmptyList[Assertion]]) extends TestRun[F]
-  final case class Pure[F[_]](result: NonEmptyList[Assertion]) extends TestRun[F]
-  final case class Lazy[F[_]](result: cats.Eval[NonEmptyList[Assertion]]) extends TestRun[F]
+  final case class Pure(result: NonEmptyList[Assertion]) extends TestRun[Nothing]
+  final case class Lazy(result: cats.Eval[NonEmptyList[Assertion]]) extends TestRun[Nothing]
 }
 
 object dsl {
-  //This name is bad (Predicate implies A => Boolean). Come up with a better name.
-  //Possibly worth newtyping.
+  // Shamelessly ripped off from fs2's Pure type - this is pure genius.
+  type NoEffect[A] <: Nothing
+
+  // This name is bad (Predicate implies A => Boolean). Come up with a better name.
+  // Possibly worth newtyping.
+  // This idea is heavilt inspired by ZIO Test.
   type Predicate[-A] = A => Assertion
 
   def suite[F[_]](name: String)(tests: NonEmptyList[Test[F]]): Suite[F] = new Suite(name, tests)
@@ -144,19 +148,17 @@ object dsl {
   def test[F[_]](name: String)(assertions: F[NonEmptyList[Assertion]]): NonEmptyList[Test[F]] =
     NonEmptyList.one(Test(name, TestRun.Eval(assertions)))
 
-  //todo add node to test tree to distinguish pure tests
-  //todo better type inference? Eval by default?
-  def pureTest[F[_]](name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
+  def pureTest[F[a] >: NoEffect[a]](name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
     NonEmptyList.one(Test(name, TestRun.Pure(assertions)))
 
-  def lazyTest[F[_]](name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
+  def lazyTest[F[a] >: NoEffect[a]](name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
     NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions))))
 
   def assertion(cond: Boolean, ifFalse: String): NonEmptyList[Assertion] = ensure(cond, predicates.all.isTrue(ifFalse))
 
   def ensure[A](value: A, predicate: Predicate[A]): NonEmptyList[Assertion] = NonEmptyList.one(predicate(value))
 
-  def failed[F[_]](name: String): NonEmptyList[Test[F]] = pureTest(name)(NonEmptyList.one(Assertion.Failed("Failed")))
+  def failed[F[a] >: NoEffect[a]](name: String): NonEmptyList[Test[F]] = pureTest[F](name)(NonEmptyList.one(Assertion.Failed("Failed")))
 }
 
 object predicates {
@@ -194,14 +196,14 @@ class NeuExample[F[_]: Timer: Applicative: Defer] {
 
   val content = suite("examples") {
     tests(
-      pureTest[F]("first test") {
+      pureTest("first test") {
         assertion(1 === 0, "1 was not zero") <+>
           ensure(1, greaterThan(5))
       },
       test[F]("io test") {
         Timer[F].sleep(500.millis).map(a => assertion(a === (()), "unit was not unit"))
       },
-      lazyTest[F]("lazy test") {
+      lazyTest("lazy test") {
         ensure(5, equalTo(4))
       }.combineN(5)
     )
