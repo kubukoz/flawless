@@ -1,21 +1,43 @@
 package flawless.tests
 
-import cats.data.NonEmptyList
 import cats.effect.ExitCode
 import cats.effect.IO
 import cats.effect.IOApp
 import flawless._
+import flawless.data.neu.Suites
+import flawless.data.neu.predicates.all._
+import cats.implicits._
+import flawless.data.neu.TestApp
 
 //test runner for the whole module
-object FlawlessTests extends IOApp {
+object FlawlessTests extends IOApp with TestApp {
 
   def run(args: List[String]): IO[ExitCode] = runTests(args) {
-    val parallelTests = NonEmptyList.of(
-      GetStatsTest,
-      VisitTests,
-      new ResourceTests
-    )
+    // Suites.parallel(
+    // GetStatsTest,
+    // VisitTests,
+    // new ResourceTests
+    // )
 
-    Tests.parSequence(parallelTests.map(_.runSuite))
+    import flawless.data.neu.dsl._
+
+    import scala.concurrent.duration._
+
+    Suites.one {
+      suite("Hello world") {
+        tests(
+          test("world") {
+            IO.sleep(10.millis).map(_ => ensure((), equalTo(())))
+          },
+          testMonadic[IO]("monadic") { assertions =>
+            for {
+              _ <- assertions.addAll(ensure(1, equalTo(5)))
+              _ <- IO.sleep(200.millis)
+              _ <- assertions.addAll(ensure(2, equalTo(4)))
+            } yield ()
+          }
+        )
+      }
+    }
   }
 }

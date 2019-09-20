@@ -1,4 +1,4 @@
-package flawless.tests
+/* package flawless.tests
 
 import flawless.Suite
 import flawless.SuiteResult
@@ -61,3 +61,4 @@ class ResourceTests(implicit cs: ContextShift[IO]) extends Suite {
     testCancelation
   )
 }
+ */

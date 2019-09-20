@@ -1,25 +1,25 @@
 package flawless
 
-import cats.effect.IO
-import cats.effect.Resource
-import cats.implicits._
-import cats.kernel.Semigroup
-import cats.Functor
-import cats.Id
-import cats.NonEmptyParallel
-import cats.NonEmptyTraverse
-import cats.Parallel
-import cats.Show
-import cats.data.NonEmptyList
-import flawless.data.low.TestAlg
-import flawless.data.low.TestAlg.LiftResource
-import flawless.data.low.TestAlg.Merge
-import flawless.data.low.TestAlg.Run
-import flawless.data.low.TestAlg.Pure
-import flawless.fixpoint.HFix
-import flawless.stats.Location
-import cats.Applicative
-
+// import cats.effect.IO
+// import cats.effect.Resource
+// import cats.implicits._
+// import cats.kernel.Semigroup
+// import cats.Functor
+// import cats.Id
+// import cats.NonEmptyParallel
+// import cats.NonEmptyTraverse
+// import cats.Parallel
+// import cats.Show
+// import cats.data.NonEmptyList
+// import flawless.data.low.TestAlg
+// import flawless.data.low.TestAlg.LiftResource
+// import flawless.data.low.TestAlg.Merge
+// import flawless.data.low.TestAlg.Run
+// import flawless.data.low.TestAlg.Pure
+// import flawless.fixpoint.HFix
+// import flawless.stats.Location
+// import cats.Applicative
+/*
 final class Tests[A] private[flawless] (private[flawless] val tree: HFix[TestAlg, A]) {
   def interpret: IO[A] = HFix.hCata(tree)(TestAlg.algebras.interpret)
   def via(v: IO[SuiteResult] => IO[SuiteResult]): Tests[A] = HFix.hCata(tree)(TestAlg.algebras.visitRun(v))
@@ -105,3 +105,4 @@ object SuiteResult {
 trait Suite {
   def runSuite: Tests[SuiteResult]
 }
+ */
