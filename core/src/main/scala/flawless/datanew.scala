@@ -37,7 +37,14 @@ import cats.~>
 import cats.effect.Resource
 import cats.effect.Bracket
 import flawless.data.neu.Suites.RResource
+import flawless.data.neu.Assertion.Failed
+import flawless.data.neu.Assertion.Successful
+import flawless.data.neu.TestRun.Pure
+import flawless.data.neu.TestRun.Lazy
 
+////////////////////////////////////////////////////////
+////////// interpretation stuff ////////////////////////
+////////////////////////////////////////////////////////
 trait Interpreter[F[_]] {
 
   /**
@@ -143,32 +150,17 @@ object Reporter {
     consoleInstance(Kleisli.liftK, λ[Kleisli[F, Depth, ?] ~> F](_.run(Depth(0))))
 }
 
-/**
-  * An abstraction on methods of combining two effects - parallel or sequential
-  */
-sealed trait Traversal[F[_]] extends Product with Serializable {
-  final def traverse[S[_]: NonEmptyTraverse, A, B](as: S[A])(f: A => F[B]): F[S[B]] = this match {
-    case Traversal.Sequential(implicit0(apply: Apply[F]))        => as.nonEmptyTraverse(f)
-    case Traversal.Parallel(implicit0(nep: NonEmptyParallel[F])) => Parallel.parNonEmptyTraverse(as)(f)
+////////////////////////////////////////////////////////
+////////// testing API /////////////////////////////////
+////////////////////////////////////////////////////////
+
+sealed trait Assertion extends Product with Serializable {
+
+  def isSuccessful: Boolean = this match {
+    case Failed(_)  => false
+    case Successful => true
   }
-
-  final def sequence[S[_]: NonEmptyTraverse, A](as: S[F[A]]): F[S[A]] = traverse(as)(identity)
 }
-
-object Traversal {
-
-  final private case class Parallel[F[_]](nep: NonEmptyParallel[F]) extends Traversal[F]
-  final private case class Sequential[F[_]](apply: Apply[F]) extends Traversal[F]
-
-  // (potentially specialized) implementation of Sequential for Id,
-  // which means identity in case of `sequence` and `map` in case of `traverse`.
-  val identity: Traversal[Id] = sequential
-
-  def sequential[F[_]: Apply]: Traversal[F] = Sequential(Apply[F])
-  def parallel[F[_]: NonEmptyParallel]: Traversal[F] = Parallel(NonEmptyParallel[F])
-}
-
-sealed trait Assertion extends Product with Serializable
 
 object Assertion {
   case object Successful extends Assertion
@@ -209,6 +201,37 @@ object Suites {
 
   final case class One[F[_]](suite: Suite[F]) extends Suites[F]
   final case class RResource[F[_]](resuites: Resource[F, Suites[F]], bracket: Bracket[F, Throwable]) extends Suites[F]
+
+  def flatten(suites: Suites[Id]): NonEmptyList[Suite[Id]] = suites match {
+    case Sequence(suites, _) => suites.flatMap(flatten)
+    case One(suite)          => suite.pure[NonEmptyList]
+    case RResource(_, _)     => throw new AssertionError("Impossible")
+  }
+}
+
+/**
+  * An abstraction on methods of combining two effects - parallel or sequential
+  */
+sealed trait Traversal[F[_]] extends Product with Serializable {
+  final def traverse[S[_]: NonEmptyTraverse, A, B](as: S[A])(f: A => F[B]): F[S[B]] = this match {
+    case Traversal.Sequential(implicit0(apply: Apply[F]))        => as.nonEmptyTraverse(f)
+    case Traversal.Parallel(implicit0(nep: NonEmptyParallel[F])) => Parallel.parNonEmptyTraverse(as)(f)
+  }
+
+  final def sequence[S[_]: NonEmptyTraverse, A](as: S[F[A]]): F[S[A]] = traverse(as)(identity)
+}
+
+object Traversal {
+
+  final private case class Parallel[F[_]](nep: NonEmptyParallel[F]) extends Traversal[F]
+  final private case class Sequential[F[_]](apply: Apply[F]) extends Traversal[F]
+
+  // (potentially specialized) implementation of Sequential for Id,
+  // which means identity in case of `sequence` and `map` in case of `traverse`.
+  val identity: Traversal[Id] = sequential
+
+  def sequential[F[_]: Apply]: Traversal[F] = Sequential(Apply[F])
+  def parallel[F[_]: NonEmptyParallel]: Traversal[F] = Parallel(NonEmptyParallel[F])
 }
 
 final case class Suite[F[_]](name: String, tests: NonEmptyList[Test[F]]) {
@@ -227,6 +250,12 @@ sealed trait TestRun[+F[_]] extends Product with Serializable {
   def via[F2[a] >: F[a]](f: F[NonEmptyList[Assertion]] => F2[NonEmptyList[Assertion]]): TestRun[F2] = this match {
     case TestRun.Eval(effect)              => TestRun.Eval(f(effect))
     case TestRun.Pure(_) | TestRun.Lazy(_) => this
+  }
+
+  def assertions[F2[a] >: F[a]](implicit applicative: Applicative[F2]): F2[NonEmptyList[Assertion]] = this match {
+    case TestRun.Eval(effect) => effect
+    case TestRun.Pure(result) => result.pure[F2]
+    case TestRun.Lazy(result) => result.value.pure[F2]
   }
 }
 
@@ -354,7 +383,14 @@ class NeuExample[F[_]: Timer: Sync] {
   }
 }
 
+// todo better name
+trait SuiteClass[F[_]] {
+  def runSuite: Suite[F]
+}
+
 trait TestApp { self: IOApp =>
+  implicit val console: Console[IO] = Console.io
+
   implicit def defaultInterpreter[F[_]: Sync]: Interpreter[F] = {
     type Effect[A] = Kleisli[F, Depth, A]
 
@@ -369,14 +405,7 @@ trait TestApp { self: IOApp =>
 
 object Run extends IOApp with TestApp {
 
-  //these are going away before the merge
-  def flatten(suites: Suites[Id]): NonEmptyList[Suite[Id]] = suites match {
-    case Sequence(suites, _) => suites.flatMap(flatten)
-    case One(suite)          => suite.pure[NonEmptyList]
-    case RResource(_, _)     => throw new AssertionError("Impossible")
-  }
-
-  def showResults(testResults: Suites[Id]): String = flatten(testResults).map(showResult).mkString_("Suites: [\n", "\n", "]")
+  def showResults(testResults: Suites[Id]): String = Suites.flatten(testResults).map(showResult).mkString_("Suites: [\n", "\n", "]")
 
   def showResult(suite: Suite[Id]): String =
     show"${suite.name}:\n" + suite.tests.map(showR).reduceMap(_.linesIterator.toList.map("  " + _)).mkString("\n")

@@ -1,15 +1,16 @@
 package flawless.tests
 
 import cats.data.NonEmptyList
-import flawless._
 import flawless.stats._
 import cats.implicits._
+import flawless.data.neu.SuiteClass
+import flawless.data.neu.Suite
+import flawless.data.neu.dsl._
 
-object GetStatsTest extends Suite {
+object GetStatsTest extends SuiteClass[Nothing] {
   import RunStats.Stat
-  import flawless.syntax._
 
-  val runSuite: Tests[SuiteResult] = {
+  val runSuite: Suite[Nothing] = /* {
     tests(
       test("1 test: 1 succ / 0 fail") {
         pureTest("Example") {
@@ -45,6 +46,7 @@ object GetStatsTest extends Suite {
         }
       }
     )
-  }
+  } */
+  ???
   //todo property based tests - the total amount of each stat should be the sum of failed+succeeded
 }

@@ -1,24 +1,30 @@
-import cats.data.NonEmptyList
 import cats.effect.ExitCode
-import cats.effect.IO
 import cats.implicits._
 import flawless.stats.RunStats
+import cats.Id
 
 package object flawless {
-  import cats.effect.Console.io._
+  import cats.FlatMap
+  import flawless.data.neu.Test
+  import cats.Monad
+  import cats.Applicative
+  import cats.effect.ConsoleOut
+  import flawless.data.neu.Interpreter
+  import flawless.data.neu.Suites
 
-  def loadArgs(args: List[String]): IO[Unit] = {
+  def loadArgs[F[_]: Applicative](args: List[String]): F[Unit] = {
     val _ = args
-    IO.unit
+    Applicative[F].unit
   }
 
-  def runTests(args: List[String])(iotest: Tests[NonEmptyList[SuiteResult]]) =
-    loadArgs(args) >> iotest.interpret.flatMap(summarize)
+  def runTests[F[_]: Interpreter: ConsoleOut: Monad](args: List[String])(suites: Suites[F]): F[ExitCode] =
+    loadArgs[F](args) *> suites.interpret.flatMap(summarize[F])
 
-  def summarize(specs: NonEmptyList[SuiteResult]): IO[ExitCode] = {
+  def summarize[F[_]: ConsoleOut: FlatMap](suites: Suites[Id]): F[ExitCode] = {
     import scala.io.AnsiColor
+    val suitesFlat = Suites.flatten(suites)
 
-    val stats = RunStats.fromSuites(specs)
+    val stats = RunStats.fromSuites(suitesFlat)
 
     val weGood = stats.suite.failed === 0
     val exit = if (weGood) ExitCode.Success else ExitCode.Error
@@ -29,16 +35,19 @@ package object flawless {
     def inRed(s: String): String =
       AnsiColor.RED + s + AnsiColor.RESET
 
-    def inColor(test: TestResult): String = {
-      val successful = test.assertions.value.forall(_.isSuccessful)
+    def inColor(test: Test[Id]): String = {
+      val assertions = test.result.assertions
+
+      val successful = assertions.forall(_.isSuccessful)
       val testName =
         if (successful) inGreen(show"Passed: ${test.name}")
         else inRed(show"Failed: ${test.name}")
 
-      val failedAssertions = test.assertions.value.toList.collect {
-        case Assertion.Failed(failure) =>
+      val failedAssertions = assertions.toList.collect {
+        case flawless.data.neu.Assertion.Failed(failure) =>
           inRed(
-            show"${failure.text} (${failure.location})"
+            // show"${failure.text} (${failure.location})"
+            failure //todo
           )
       }
 
@@ -65,12 +74,12 @@ package object flawless {
             |$failureMessage""".stripMargin
     }
 
-    val showSummary = putStrLn("============ TEST SUMMARY ============")
+    val showSummary = ConsoleOut[F].putStrLn("============ TEST SUMMARY ============")
 
-    val showResults = specs.flatMap(_.results).map(inColor).traverse(putStrLn)
+    val showResults = suitesFlat.flatMap(_.tests).map(inColor).nonEmptyTraverse_(ConsoleOut[F].putStrLn)
 
-    showResults >>
-      showSummary >>
-      putStrLn(msg).as(exit)
+    showResults *>
+      showSummary *>
+      ConsoleOut[F].putStrLn(msg).as(exit)
   }
 }

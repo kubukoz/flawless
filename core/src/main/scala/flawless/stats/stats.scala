@@ -5,19 +5,23 @@ import cats.Foldable
 import cats.Show
 import cats.implicits._
 import cats.data.NonEmptyList
-import flawless.Assertion
-import flawless.SuiteResult
-import flawless.TestResult
 import monocle.Lens
 import monocle.Traversal
 import monocle.macros.GenLens
+import flawless.data.neu.Suites
+import cats.Id
+import flawless.data.neu.Suite
+import flawless.data.neu.Test
+import flawless.data.neu.Assertion
+import monocle.macros.GenPrism
+import flawless.data.neu.TestRun
 
 final case class RunStats(suite: RunStats.Stat, test: RunStats.Stat, assertion: RunStats.Stat)
 
 object RunStats {
 
-  def fromSuites(suites: NonEmptyList[SuiteResult]): RunStats = {
-    val stats = getStat(suites.toList)
+  def fromSuites[F[_]: Foldable](suites: F[Suite[Id]]): RunStats = {
+    val stats = getStat(suites)
 
     val suiteStat = stats.of(Traversal.id, optics.suiteToAssertions)
     val testStat = stats.of(optics.suiteToTests, optics.testToAssertions)
@@ -32,19 +36,28 @@ object RunStats {
 
   //Lenses/traversals for suite/test/assertion results
   private object optics {
-    private val suiteTests: Lens[SuiteResult, NonEmptyList[TestResult]] =
-      GenLens[SuiteResult](_.results)
+    private val suiteTests: Lens[Suite[Id], NonEmptyList[Test[Id]]] =
+      GenLens[Suite[Id]](_.tests)
 
-    private val testAssertions: Lens[TestResult, NonEmptyList[Assertion]] =
-      GenLens[TestResult](_.assertions.value)
+    // private val suitesSuite: Traversal[Suites[Id], Suite[Id]] = ???
 
-    val suiteToTests: Traversal[SuiteResult, TestResult] =
+    private val testRunToAssertions: Lens[TestRun[Id], NonEmptyList[Assertion]] = Lens[TestRun[Id], NonEmptyList[Assertion]] {
+      case TestRun.Eval(e) => e
+      case TestRun.Pure(e) => e
+      case TestRun.Lazy(e) => e.value
+    }(e => _ => TestRun.Pure(e))
+
+    private val testAssertions: Lens[Test[Id], NonEmptyList[flawless.data.neu.Assertion]] =
+      GenLens[Test[Id]](_.result).composeLens(testRunToAssertions)
+
+    val suiteToTests: Traversal[Suite[Id], Test[Id]] =
       suiteTests.composeTraversal(Traversal.fromTraverse)
 
-    val testToAssertions: Traversal[TestResult, Assertion] =
+    val testToAssertions: Traversal[Test[Id], flawless.data.neu.Assertion] =
       testAssertions.composeTraversal(Traversal.fromTraverse)
 
-    val suiteToAssertions: Traversal[SuiteResult, Assertion] = optics.suiteToTests >>> optics.testToAssertions
+    val suiteToAssertions: Traversal[Suite[Id], flawless.data.neu.Assertion] =
+      optics.suiteToTests >>> optics.testToAssertions
   }
 
   /**
@@ -62,15 +75,15 @@ object RunStats {
   ): (List[Selected], List[Selected]) =
     fa.foldMap(select.getAll(_).partition(p))
 
-  private def getStat[F[_]: Foldable](suites: F[SuiteResult]) = new GetStatsPartiallyApplied(suites)
+  private def getStat[F[_]: Foldable](suites: F[Suite[Id]]) = new GetStatsPartiallyApplied(suites)
 
-  final class GetStatsPartiallyApplied[F[_]: Foldable] private[RunStats] (suites: F[SuiteResult]) {
+  final class GetStatsPartiallyApplied[F[_]: Foldable] private[RunStats] (suites: F[Suite[Id]]) {
 
     /**
       * Get the stats for the selected metric (as defined by the `select` traversal) of all the suites in `fa`.
       * `traversal` defines how to go from the selected metric to the assertions.
       * */
-    def of[Selected](select: Traversal[SuiteResult, Selected], traversal: Traversal[Selected, Assertion]): RunStats.Stat = {
+    def of[Selected](select: Traversal[Suite[Id], Selected], traversal: Traversal[Selected, Assertion]): RunStats.Stat = {
       val (succeeded, failed) =
         partitionAll(suites, select, traversal.all(_.isSuccessful))
 

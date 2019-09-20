@@ -1,5 +1,5 @@
 package flawless.tests
-
+/*
 import cats.implicits._
 import cats.data.NonEmptyList
 import cats.effect.IO
@@ -43,3 +43,4 @@ object VisitTests extends Suite {
     }
   )
 }
+ */
