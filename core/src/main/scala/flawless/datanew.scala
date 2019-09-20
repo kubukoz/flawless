@@ -53,6 +53,10 @@ trait Interpreter[F[_]] {
 }
 
 object Interpreter {
+  //todo default interpreter must have access to a console
+  //should log continually using that console
+  //default instance available in TestApp/FlawlessApp trait selftyping IOApp, uses console4cats
+  //generic interface allows any kind of console, e.g. logging to file or remote or WriterT
   implicit def applyInterpreter[F[_]: Applicative]: Interpreter[F] = new Interpreter[F] {
     //todo tests in a suite should have multiple methods of traversal
     private val interpretTest: Test[F] => F[Test[Id]] = test => {
