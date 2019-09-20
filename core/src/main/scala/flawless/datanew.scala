@@ -20,6 +20,8 @@ import flawless.data.neu.Assertion.Successful
 import flawless.data.neu.Assertion.Failed
 import cats.Defer
 import cats.Eval
+import flawless.data.neu.TestRun.Pure
+import flawless.data.neu.TestRun.Lazy
 
 sealed trait Assertion extends Product with Serializable
 
@@ -121,9 +123,19 @@ final case class Suite[F[_]](name: String, tests: NonEmptyList[Test[F]]) {
   def via(f: Test[F] => Test[F]): Suite[F] = Suite(name, tests.map(f))
 }
 
-final case class Test[+F[_]](name: String, result: TestRun[F])
+final case class Test[+F[_]](name: String, result: TestRun[F]) {
+  //Maybe use via in interpreter?
+  //todo add ability for `via` to run effects (think modifyF from monocle)
+  def via[G[_]](f: TestRun[F] => TestRun[G]): Test[G] = Test(name, f(result))
+}
 
-sealed trait TestRun[+F[_]] extends Product with Serializable
+sealed trait TestRun[+F[_]] extends Product with Serializable {
+
+  def via[F2[a] >: F[a]](f: F[NonEmptyList[Assertion]] => F2[NonEmptyList[Assertion]]): TestRun[F2] = this match {
+    case TestRun.Eval(effect)              => TestRun.Eval(f(effect))
+    case TestRun.Pure(_) | TestRun.Lazy(_) => this
+  }
+}
 
 object TestRun {
   final case class Eval[F[_]](effect: F[NonEmptyList[Assertion]]) extends TestRun[F]
@@ -137,7 +149,7 @@ object dsl {
 
   // This name is bad (Predicate implies A => Boolean). Come up with a better name.
   // Possibly worth newtyping.
-  // This idea is heavilt inspired by ZIO Test.
+  // This idea is heavily inspired by ZIO Test.
   type Predicate[-A] = A => Assertion
 
   def suite[F[_]](name: String)(tests: NonEmptyList[Test[F]]): Suite[F] = new Suite(name, tests)
@@ -158,6 +170,7 @@ object dsl {
 
   def ensure[A](value: A, predicate: Predicate[A]): NonEmptyList[Assertion] = NonEmptyList.one(predicate(value))
 
+  //probably useless
   def failed[F[a] >: NoEffect[a]](name: String): NonEmptyList[Test[F]] = pureTest[F](name)(NonEmptyList.one(Assertion.Failed("Failed")))
 }
 
@@ -183,8 +196,8 @@ object predicates {
     def failed(message: String): Predicate[Any] = _ => Assertion.Failed(message)
 
     def isTrue(ifFalse: String): Predicate[Boolean] = {
-      case true  => Successful
-      case false => Failed(ifFalse)
+      case true  => Assertion.Successful
+      case false => Assertion.Failed(ifFalse)
     }
   }
 }
@@ -200,7 +213,7 @@ class NeuExample[F[_]: Timer: Applicative: Defer] {
         assertion(1 === 0, "1 was not zero") <+>
           ensure(1, greaterThan(5))
       },
-      test[F]("io test") {
+      test("io test") {
         Timer[F].sleep(500.millis).map(a => assertion(a === (()), "unit was not unit"))
       },
       lazyTest("lazy test") {
@@ -211,6 +224,23 @@ class NeuExample[F[_]: Timer: Applicative: Defer] {
 }
 
 object Run extends IOApp {
+
+  //these are going away before the merge
+  def flatten(suites: Suites[Id]): NonEmptyList[Suite[Id]] = suites match {
+    case Sequence(suites, _) => suites.flatMap(flatten)
+    case One(suite)          => suite.pure[NonEmptyList]
+  }
+
+  def showResults(testResults: Suites[Id]): String = flatten(testResults).map(showResult).mkString_("Suites: [\n", "\n", "]")
+
+  def showResult(suite: Suite[Id]): String =
+    show"${suite.name}:\n" + suite.tests.map(showR).reduceMap(_.lines.toList.map("  " + _)).mkString("\n")
+
+  def showR(test: Test[Id]): String =
+    test.name + ":\n" + (test.result match {
+      case TestRun.Pure(result) => result.map(_.toString).map("  " + _).mkString_("\n")
+      case _                    => throw new AssertionError("Impossible")
+    })
 
   def run(args: List[String]): IO[ExitCode] = {
     val data = new NeuExample().content
@@ -224,9 +254,8 @@ object Run extends IOApp {
         )
       )
 
-    tests.viaTest(_ => dsl.failed[IO]("Oh no!").head).interpret.flatMap { p =>
-      // IO(println(tests)) *>
-      IO(println(p))
+    tests.viaTest(_.via(_.via(_ => predicates.all.failed("Nuuuuuuu!")(()).pure[NonEmptyList].pure[IO]))).interpret.flatMap { p =>
+      IO(println(showResults(p)))
     }
   }.as(ExitCode.Success)
 }
