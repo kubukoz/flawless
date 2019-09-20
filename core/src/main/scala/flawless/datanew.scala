@@ -16,12 +16,8 @@ import flawless.data.neu.Suites.One
 import cats.Show
 import com.softwaremill.diffx._
 import cats.NonEmptyTraverse
-import flawless.data.neu.Assertion.Successful
-import flawless.data.neu.Assertion.Failed
 import cats.Defer
 import cats.Eval
-import flawless.data.neu.TestRun.Pure
-import flawless.data.neu.TestRun.Lazy
 
 sealed trait Assertion extends Product with Serializable
 
@@ -253,6 +249,33 @@ object Run extends IOApp {
           Suites.one(data)
         )
       )
+
+    // deflake -- defined on single test by default
+    // customize to apply on whole suites
+    // deflake.suites
+    // deflake.everything
+    //
+    // ignore -- defined on assertion by default (ignores assertion it's passed on)
+    // ignore(suite) - ignores entire suite straight away
+    // ignore(everything) - ignores everything
+    // ignore.tests(everything) - ignores each test in everything
+    // ignore.assertions(everything)
+    // ignore.suite(everything)
+    //
+    // heuristic - given scope <♾, internal>, can be applied on anything that's > internal.
+    // default behavior is for the whole X it's applied on. Can be further scoped up to the point of internal.
+    // e.g. aspect defined for scope up to Test, e.g. `caching`:
+    // caching(assertion) -- compile error
+    // caching(test) -- caches test
+    // caching(suite) -- caches whole suite together
+    // caching.tests(suite) -- caches each test in suite individually
+    // caching.assertions -- doesn't compile
+    // caching.tests(everything) -- caches each test in set of suites
+    //
+    // basically:
+    // operator.external(external) == operator(external)
+    // operator.internal1(external) == external.via(operator)
+    // operator.internal2(external) == external.via(operator.internal1) == external.via(_.via(operator))
 
     tests.viaTest(_.via(_.via(_ => predicates.all.failed("Nuuuuuuu!")(()).pure[NonEmptyList].pure[IO]))).interpret.flatMap { p =>
       IO(println(showResults(p)))
