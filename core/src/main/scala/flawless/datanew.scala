@@ -24,6 +24,141 @@ import cats.effect.concurrent.Ref
 import cats.data.Chain
 import cats.Foldable
 import cats.kernel.Order
+import cats.effect.Console
+import cats.effect.ConsoleOut
+import cats.effect.SyncConsole
+import cats.mtl.ApplicativeLocal
+import cats.mtl.instances.all._
+import cats.Monad
+import cats.FlatMap
+import cats.data.Kleisli
+import flawless.data.neu.DeepConsole.Depth
+import cats.~>
+
+trait Interpreter[F[_]] {
+
+  /**
+    * Interprets the test structure to the underlying effect. This is where all the actualy execution happens.
+    */
+  def interpret: Suites[F] => F[Suites[Id]]
+}
+
+object Interpreter {
+  implicit def defaultInterpreter[F[_]: Monad, G[_]: Apply](implicit reporter: Reporter[F, G]): Interpreter[F] =
+    new Interpreter[F] {
+      private val interpretTest: Test[F] => F[Test[Id]] = { test =>
+        def finish(results: NonEmptyList[Assertion]): Test[Id] = Test(test.name, TestRun.Pure(results))
+
+        test.result match {
+          //this is a GADT skolem - you think I'd know what that means by now...
+          case eval: TestRun.Eval[f] => eval.effect.map(finish)
+          case TestRun.Pure(result)  => finish(result).pure[F]
+          case TestRun.Lazy(e)       => e.map(finish).value.pure[F]
+        }
+      }
+
+      //todo tests in a suite should have multiple methods of traversal
+      private val interpretSuite: Suite[F] => G[Suite[Id]] = suite =>
+        suite.tests.nonEmptyTraverse(reporter.reportTest(interpretTest.map(reporter.lift(_)))).map(Suite[Id](suite.name, _))
+
+      val interpretN: Suites[F] => G[Suites[Id]] = {
+        case Sequence(suites, traversal) =>
+          //this interpret call will make sure every spec starts with a clean depth scope - watch this space
+          reporter.lift(traversal.traverse(suites)(interpret)).map(Sequence(_, Traversal.identity))
+        case One(suite) => reporter.reportSuite(interpretSuite)(suite).map(One(_))
+      }
+
+      val interpret: Suites[F] => F[Suites[Id]] = interpretN.map(reporter.run(_))
+    }
+}
+
+trait DeepConsole[F[_]] {
+  def putStrLn[A: Show](a: A): F[Unit]
+  def nested[A](fa: F[A]): F[A]
+}
+
+object DeepConsole {
+  def apply[F[_]](implicit F: DeepConsole[F]): DeepConsole[F] = F
+
+  final case class Depth(value: Int) extends AnyVal {
+    def deeper: Depth = Depth(value + 1)
+  }
+
+  object Depth {
+    type Local[F[_]] = ApplicativeLocal[F, Depth]
+    def local[F[_]](implicit F: Local[F]): Local[F] = F
+  }
+
+  def instance[F[_]: ConsoleOut: Depth.Local: FlatMap]: DeepConsole[F] = new DeepConsole[F] {
+    private val spaces = Depth.local[F].ask.map(" " * 2 * _.value)
+
+    def putStrLn[A: Show](a: A): F[Unit] = spaces.flatMap(spacesString => ConsoleOut[F].putStrLn(spacesString + a))
+
+    def nested[A](fa: F[A]): F[A] = Depth.local[F].local(_.deeper)(fa)
+  }
+}
+
+trait Reporter[F[_], G[_]] {
+  //lift the execution effect to the reporting effect
+  def lift: F ~> G
+  //apply the reporting effect and unlift to execution effect
+  def run: G ~> F
+
+  def reportTest: (Test[F] => G[Test[Id]]) => Test[F] => G[Test[Id]]
+  def reportSuite: (Suite[F] => G[Suite[Id]]) => Suite[F] => G[Suite[Id]]
+}
+
+object Reporter {
+  def apply[F[_], G[_]](implicit F: Reporter[F, G]): Reporter[F, G] = F
+
+  def consoleInstance[F[_], G[_]: FlatMap, A](_lift: F ~> G, _unlift: G ~> F)(implicit DC: DeepConsole[G]): Reporter[F, G] =
+    new Reporter[F, G] {
+      val lift: F ~> G = _lift
+      val run: G ~> F = _unlift
+
+      val reportTest: (Test[F] => G[Test[Id]]) => Test[F] => G[Test[Id]] = f =>
+        test =>
+          //this is going to need access to a summarizer of tests,
+          //so that it can display the amount of assertions that succeeded, failed, etc., with colors
+          DC.putStrLn("Starting test: " + test.name) *> f(test).flatTap { result =>
+            DC.putStrLn("Finished test: " + test.name + s", result: ${result.result}")
+          }
+
+      val reportSuite: (Suite[F] => G[Suite[Id]]) => Suite[F] => G[Suite[Id]] = f =>
+        suite =>
+          DC.putStrLn("Starting suite: " + suite.name) *> DC.nested(f(suite)).flatTap { result =>
+            DC.putStrLn("Finished suite: " + suite.name + s", result: ${result.tests}")
+          }
+    }
+
+  def localStateInstance[F[_]: FlatMap](implicit DC: DeepConsole[Kleisli[F, Depth, ?]]): Reporter[F, Kleisli[F, Depth, ?]] =
+    consoleInstance(Kleisli.liftK, λ[Kleisli[F, Depth, ?] ~> F](_.run(Depth(0))))
+}
+
+/**
+  * An abstraction on methods of combining two effects - parallel or sequential
+  */
+sealed trait Traversal[F[_]] extends Product with Serializable {
+  final def traverse[S[_]: NonEmptyTraverse, A, B](as: S[A])(f: A => F[B]): F[S[B]] = this match {
+    case Traversal.Sequential(implicit0(apply: Apply[F]))        => as.nonEmptyTraverse(f)
+    case Traversal.Parallel(implicit0(nep: NonEmptyParallel[F])) => Parallel.parNonEmptyTraverse(as)(f)
+  }
+
+  final def sequence[S[_]: NonEmptyTraverse, A](as: S[F[A]]): F[S[A]] = traverse(as)(identity)
+}
+
+object Traversal {
+
+  final private case class Parallel[F[_]](nep: NonEmptyParallel[F]) extends Traversal[F]
+  final private case class Sequential[F[_]](apply: Apply[F]) extends Traversal[F]
+
+  // (potentially specialized) implementation of Sequential for Id,
+  // which means identity in case of `sequence` and `map` in case of `traverse`.
+  val identity: Traversal[Id] = sequential
+
+  def sequential[F[_]: Apply]: Traversal[F] = Sequential(Apply[F])
+  def parallel[F[_]: NonEmptyParallel]: Traversal[F] = Parallel(NonEmptyParallel[F])
+}
 
 sealed trait Assertion extends Product with Serializable
 
@@ -33,7 +168,6 @@ object Assertion {
 }
 
 sealed trait Suites[F[_]] extends Product with Serializable {
-
   def interpret(implicit interpreter: Interpreter[F]): F[Suites[Id]] = interpreter.interpret(this)
 
   /**
@@ -50,68 +184,7 @@ sealed trait Suites[F[_]] extends Product with Serializable {
   def viaTest(f: Test[F] => Test[F]): Suites[F] = via(_.via(f))
 }
 
-trait Interpreter[F[_]] {
-
-  /**
-    * Interprets the test structure to the underlying effect. This is where all the actualy execution happens.
-    */
-  def interpret: Suites[F] => F[Suites[Id]]
-}
-
-object Interpreter {
-  //todo default interpreter must have access to a console
-  //should log continually using that console
-  //default instance available in TestApp/FlawlessApp trait selftyping IOApp, uses console4cats
-  //generic interface allows any kind of console, e.g. logging to file or remote or WriterT
-  implicit def applyInterpreter[F[_]: Applicative]: Interpreter[F] = new Interpreter[F] {
-    //todo tests in a suite should have multiple methods of traversal
-    private val interpretTest: Test[F] => F[Test[Id]] = test => {
-      def finish(results: NonEmptyList[Assertion]): Test[Id] = Test(test.name, TestRun.Pure(results))
-
-      test.result match {
-        //this is a GADT skolem - you think I'd know what that means by now...
-        case eval: TestRun.Eval[f] => eval.effect.map(finish)
-        case TestRun.Pure(result)  => finish(result).pure[F]
-        case TestRun.Lazy(e)       => e.map(finish).value.pure[F]
-      }
-    }
-
-    private val interpretSuite: Suite[F] => F[Suite[Id]] = suite =>
-      suite.tests.nonEmptyTraverse(interpretTest).map(Suite[Id](suite.name, _))
-
-    val interpret: Suites[F] => F[Suites[Id]] = {
-      case Sequence(suites, traversal) => traversal.traverse(suites)(interpret).map(Sequence(_, Traversal.identity))
-      case One(suite)                  => interpretSuite.apply(suite).map(One(_))
-    }
-  }
-}
-
-/**
-  * An abstraction on methods of combining two effects - parallel or sequential
-  */
-sealed trait Traversal[F[_]] extends Product with Serializable {
-  final def traverse[S[_]: NonEmptyTraverse, A, B](as: S[A])(f: A => F[B]): F[S[B]] = this match {
-    case Traversal.Sequential(implicit0(apply: Apply[F]))        => as.nonEmptyTraverse(f)
-    case Traversal.Parallel(implicit0(nep: NonEmptyParallel[F])) => Parallel.parNonEmptyTraverse(as)(f)
-  }
-
-  final def sequence[S[_]: NonEmptyTraverse, A](as: S[F[A]]): F[S[A]] = traverse(as)(identity)
-}
-
-object Traversal {
-  final private case class Parallel[F[_]](nep: NonEmptyParallel[F]) extends Traversal[F]
-  final private case class Sequential[F[_]](apply: Apply[F]) extends Traversal[F]
-
-  // (potentially specialized) implementation of Sequential for Id,
-  // which means identity in case of `sequence` and `map` in case of `traverse`.
-  val identity: Traversal[Id] = sequential
-
-  def sequential[F[_]: Apply]: Traversal[F] = Sequential(Apply[F])
-  def parallel[F[_]: NonEmptyParallel]: Traversal[F] = Parallel(NonEmptyParallel[F])
-}
-
 object Suites {
-
   def one[F[_]: Applicative](suite: Suite[F]): Suites[F] = One(suite)
 
   def parallel[F[_]: NonEmptyParallel, G[_]](first: Suites[F], rest: Suites[F]*): Suites[F] =
@@ -137,6 +210,7 @@ final case class Test[+F[_]](name: String, result: TestRun[F]) {
 
 sealed trait TestRun[+F[_]] extends Product with Serializable {
 
+  //todo signature, changing effects
   def via[F2[a] >: F[a]](f: F[NonEmptyList[Assertion]] => F2[NonEmptyList[Assertion]]): TestRun[F2] = this match {
     case TestRun.Eval(effect)              => TestRun.Eval(f(effect))
     case TestRun.Pure(_) | TestRun.Lazy(_) => this
@@ -166,13 +240,18 @@ object dsl {
   def test[F[_]](name: String)(assertions: F[NonEmptyList[Assertion]]): NonEmptyList[Test[F]] =
     NonEmptyList.one(Test(name, TestRun.Eval(assertions)))
 
+  /**
+    * Provides access to assertions in a monadic fashion.
+    * If no assertions are added, the test completes with a single successful assertion.
+    */
   def testMonadic[F[_]: Sync](name: String)(assertions: Assertions[F] => F[Unit]): NonEmptyList[Test[F]] =
     test(name) {
-      Ref[F].of(Chain.empty[Assertion]).flatMap { ref =>
-        val readAssertions = ref.get.flatMap(_.toList.toNel.liftTo[F](new Throwable("No assertions in test!")))
-
-        assertions(Assertions.refInstance(ref)) *> readAssertions
-      }
+      Ref[F]
+        .of(Chain.empty[Assertion])
+        .flatMap { ref =>
+          assertions(Assertions.refInstance(ref)) *> ref.get
+        }
+        .map(_.toList.toNel.getOrElse(NonEmptyList.one(Assertion.Successful)))
     }
 
   def pureTest[F[a] >: NoEffect[a]](name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
@@ -217,7 +296,7 @@ object predicates {
       a =>
         Diff[T].apply(a, another) match {
           case diff if diff.isIdentical => Assertion.Successful
-          case diff                     => Assertion.Failed(show"$a was not equal to $another. Diff:\n$diff")
+          case diff                     => Assertion.Failed(show"$a was not equal to $another. Diff: $diff")
         }
     }
 
@@ -262,7 +341,20 @@ class NeuExample[F[_]: Timer: Sync] {
   }
 }
 
-object Run extends IOApp {
+trait TestApp { self: IOApp =>
+  implicit def defaultInterpreter[F[_]: Sync]: Interpreter[F] = {
+    type Effect[A] = Kleisli[F, Depth, A]
+
+    implicit val console: Console[Effect] = SyncConsole.stdio.mapK(Kleisli.liftK)
+    implicit val deepConsole: DeepConsole[Effect] = DeepConsole.instance[Effect]
+
+    implicit val reporter: Reporter[F, Effect] = Reporter.localStateInstance[F]
+
+    Interpreter.defaultInterpreter[F, Effect]
+  }
+}
+
+object Run extends IOApp with TestApp {
 
   //these are going away before the merge
   def flatten(suites: Suites[Id]): NonEmptyList[Suite[Id]] = suites match {
