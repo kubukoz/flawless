@@ -27,7 +27,9 @@ object FlawlessTests extends IOApp with TestApp {
       suite("Hello world") {
         tests(
           test("world") {
-            IO.sleep(10.millis).map(_ => ensure((), equalTo(())))
+            IO.sleep(10.millis).map { _ =>
+              ensure(1, equalTo(3)) <+> ensure(2, equalTo(2))
+            }
           },
           testMonadic[IO]("monadic") { assertions =>
             for {
