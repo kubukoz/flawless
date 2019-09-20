@@ -34,6 +34,9 @@ import cats.FlatMap
 import cats.data.Kleisli
 import flawless.data.neu.DeepConsole.Depth
 import cats.~>
+import cats.effect.Resource
+import cats.effect.Bracket
+import flawless.data.neu.Suites.RResource
 
 trait Interpreter[F[_]] {
 
@@ -63,9 +66,14 @@ object Interpreter {
 
       val interpretN: Suites[F] => G[Suites[Id]] = {
         case Sequence(suites, traversal) =>
-          //this interpret call will make sure every spec starts with a clean depth scope - watch this space
-          reporter.lift(traversal.traverse(suites)(interpret)).map(Sequence(_, Traversal.identity))
-        case One(suite) => reporter.reportSuite(interpretSuite)(suite).map(One(_))
+          val interpreted = traversal.traverse(suites) {
+            //this interpret call will make sure every spec starts with a clean depth scope - watch this space
+            interpret
+          }
+
+          reporter.lift(interpreted).map(Sequence(_, Traversal.identity))
+        case One(suite)                                                   => reporter.reportSuite(interpretSuite)(suite).map(One(_))
+        case RResource(suites, implicit0(bracket: Bracket[F, Throwable])) => reporter.lift(suites.use(interpret))
       }
 
       val interpret: Suites[F] => F[Suites[Id]] = interpretN.map(reporter.run(_))
@@ -174,8 +182,9 @@ sealed trait Suites[F[_]] extends Product with Serializable {
     * Modifies every suite in this structure with the given function.
     */
   def via(f: Suite[F] => Suite[F]): Suites[F] = this match {
-    case Sequence(suites, traversal) => Sequence(suites.map(_.via(f)), traversal)
-    case One(suite)                  => One(f(suite))
+    case Sequence(suites, traversal)                                 => Sequence(suites.map(_.via(f)), traversal)
+    case One(suite)                                                  => One(f(suite))
+    case RResource(resuites, implicit0(applicative: Applicative[F])) => RResource(resuites.map(_.via(f)), applicative)
   }
 
   /**
@@ -193,9 +202,13 @@ object Suites {
   def sequential[F[_]: Apply](first: Suites[F], rest: Suites[F]*): Suites[F] =
     Sequence[F](NonEmptyList(first, rest.toList), Traversal.sequential)
 
+  def resource[F[_]: Bracket[?[_], Throwable]](suitesInResource: Resource[F, Suites[F]]): Suites[F] =
+    RResource(suitesInResource, Bracket[F, Throwable])
+
   final case class Sequence[F[_]](suites: NonEmptyList[Suites[F]], traversal: Traversal[F]) extends Suites[F]
 
   final case class One[F[_]](suite: Suite[F]) extends Suites[F]
+  final case class RResource[F[_]](resuites: Resource[F, Suites[F]], bracket: Bracket[F, Throwable]) extends Suites[F]
 }
 
 final case class Suite[F[_]](name: String, tests: NonEmptyList[Test[F]]) {
@@ -360,6 +373,7 @@ object Run extends IOApp with TestApp {
   def flatten(suites: Suites[Id]): NonEmptyList[Suite[Id]] = suites match {
     case Sequence(suites, _) => suites.flatMap(flatten)
     case One(suite)          => suite.pure[NonEmptyList]
+    case RResource(_, _)     => throw new AssertionError("Impossible")
   }
 
   def showResults(testResults: Suites[Id]): String = flatten(testResults).map(showResult).mkString_("Suites: [\n", "\n", "]")
@@ -376,14 +390,18 @@ object Run extends IOApp with TestApp {
   def run(args: List[String]): IO[ExitCode] = {
     val data = new NeuExample().content
 
-    val tests = Suites
-      .parallel(
-        Suites.one(data),
-        Suites.sequential(
-          Suites.one(data),
-          Suites.one(data)
-        )
-      )
+    val tests = Suites.resource {
+      Resource.make(IO(println("foo")))(_ => IO(println("closing"))).map { _ =>
+        Suites
+          .parallel(
+            Suites.one(data),
+            Suites.sequential(
+              Suites.one(data),
+              Suites.one(data)
+            )
+          )
+      }
+    }
 
     // deflake -- defined on single test by default
     // customize to apply on whole suites
