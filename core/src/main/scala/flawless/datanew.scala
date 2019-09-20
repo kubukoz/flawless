@@ -16,8 +16,14 @@ import flawless.data.neu.Suites.One
 import cats.Show
 import com.softwaremill.diffx._
 import cats.NonEmptyTraverse
-import cats.Defer
 import cats.Eval
+import cats.effect.Clock
+import java.util.concurrent.TimeUnit
+import cats.effect.Sync
+import cats.effect.concurrent.Ref
+import cats.data.Chain
+import cats.Foldable
+import cats.kernel.Order
 
 sealed trait Assertion extends Product with Serializable
 
@@ -160,6 +166,15 @@ object dsl {
   def test[F[_]](name: String)(assertions: F[NonEmptyList[Assertion]]): NonEmptyList[Test[F]] =
     NonEmptyList.one(Test(name, TestRun.Eval(assertions)))
 
+  def testMonadic[F[_]: Sync](name: String)(assertions: Assertions[F] => F[Unit]): NonEmptyList[Test[F]] =
+    test(name) {
+      Ref[F].of(Chain.empty[Assertion]).flatMap { ref =>
+        val readAssertions = ref.get.flatMap(_.toList.toNel.liftTo[F](new Throwable("No assertions in test!")))
+
+        assertions(Assertions.refInstance(ref)) *> readAssertions
+      }
+    }
+
   def pureTest[F[a] >: NoEffect[a]](name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
     NonEmptyList.one(Test(name, TestRun.Pure(assertions)))
 
@@ -174,12 +189,26 @@ object dsl {
   def failed[F[a] >: NoEffect[a]](name: String): NonEmptyList[Test[F]] = pureTest[F](name)(NonEmptyList.one(Assertion.Failed("Failed")))
 }
 
+trait Assertions[F[_]] {
+  def add(assertion: Assertion): F[Unit]
+  def addAll[S[_]: Foldable](assertions: S[Assertion]): F[Unit]
+}
+
+object Assertions {
+
+  def refInstance[F[_]: Applicative](ref: Ref[F, Chain[Assertion]]): Assertions[F] =
+    new Assertions[F] {
+      def add(assertion: Assertion): F[Unit] = ref.update(_.append(assertion))
+      def addAll[S[_]: Foldable](assertions: S[Assertion]): F[Unit] = assertions.traverse_(add)
+    }
+}
+
 object predicates {
 
   object all extends DiffInstances {
     import dsl.Predicate
 
-    def greaterThan(another: Int): Predicate[Int] =
+    def greaterThan[A: Order: Show](another: A): Predicate[A] =
       a => if (a > another) Assertion.Successful else Assertion.Failed(show"$a was not greater than $another")
 
     def equalTo[T: Diff: Show](another: T): Predicate[T] = {
@@ -202,7 +231,7 @@ object predicates {
   }
 }
 
-class NeuExample[F[_]: Timer: Applicative: Defer] {
+class NeuExample[F[_]: Timer: Sync] {
   import dsl._
   import predicates.all._
   import scala.concurrent.duration._
@@ -215,6 +244,16 @@ class NeuExample[F[_]: Timer: Applicative: Defer] {
       },
       test("io test") {
         Timer[F].sleep(500.millis).map(a => assertion(a === (()), "unit was not unit"))
+      },
+      testMonadic[F]("monadic") { implicit assert =>
+        val now = Clock[F].monotonic(TimeUnit.MILLISECONDS)
+        for {
+          before <- now
+          _      <- Timer[F].sleep(500.millis)
+          after  <- now
+          _      <- assert.addAll(ensure(after, greaterThan(before)))
+          _      <- assert.addAll(assertion(true, "false"))
+        } yield ()
       },
       lazyTest("lazy test") {
         ensure(5, equalTo(4))
@@ -281,7 +320,7 @@ object Run extends IOApp {
     // operator.internal1(external) == external.via(operator)
     // operator.internal2(external) == external.via(operator.internal1) == external.via(_.via(operator))
 
-    tests.viaTest(_.via(_.via(_ => predicates.all.failed("Nuuuuuuu!")(()).pure[NonEmptyList].pure[IO]))).interpret.flatMap { p =>
+    tests.interpret.flatMap { p =>
       IO(println(showResults(p)))
     }
   }.as(ExitCode.Success)
