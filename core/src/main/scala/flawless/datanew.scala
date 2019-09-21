@@ -306,6 +306,8 @@ object dsl {
 
   def ensure[A](value: A, predicate: Predicate[A]): NonEmptyList[Assertion] = NonEmptyList.one(predicate(value))
 
+  def ensureEqual[A: Diff: Show](actual: A, expected: A): NonEmptyList[Assertion] = ensure(actual, predicates.all.equalTo(expected))
+
   //probably useless
   def failed[F[a] >: NoEffect[a]](name: String): NonEmptyList[Test[F]] = pureTest(name)(NonEmptyList.one(Assertion.Failed("Failed")))
 }
@@ -338,7 +340,7 @@ object predicates {
       a =>
         Diff[T].apply(a, another) match {
           case diff if diff.isIdentical => Assertion.Successful
-          case diff                     => Assertion.Failed(show"$a was not equal to $another. Diff: $diff")
+          case diff                     => Assertion.Failed(show"$a (actual) was not equal to $another (expected). Diff: $diff")
         }
     }
 
