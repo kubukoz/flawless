@@ -20,14 +20,12 @@ object GetStatsTest extends SuiteClass[Nothing] {
           }
         }
 
-        ensure(
+        ensureEqual(
           RunStats.fromSuites(List(input)),
-          equalTo(
-            RunStats(
-              suite = Stat(1, 1, 0),
-              test = Stat(1, 1, 0),
-              assertion = Stat(1, 1, 0)
-            )
+          RunStats(
+            suite = Stat(1, 1, 0),
+            test = Stat(1, 1, 0),
+            assertion = Stat(1, 1, 0)
           )
         )
       },
@@ -38,14 +36,12 @@ object GetStatsTest extends SuiteClass[Nothing] {
           }
         }
 
-        ensure(
+        ensureEqual(
           RunStats.fromSuites(List(input)),
-          equalTo(
-            RunStats(
-              suite = Stat(1, 0, 1),
-              test = Stat(1, 0, 1),
-              assertion = Stat(2, 1, 1)
-            )
+          RunStats(
+            suite = Stat(1, 0, 1),
+            test = Stat(1, 0, 1),
+            assertion = Stat(2, 1, 1)
           )
         )
       },
@@ -56,14 +52,12 @@ object GetStatsTest extends SuiteClass[Nothing] {
           }
         }
 
-        ensure(
+        ensureEqual(
           RunStats.fromSuites(List(input)),
-          equalTo(
-            RunStats(
-              suite = Stat(1, 0, 1),
-              test = Stat(1, 0, 1),
-              assertion = Stat(3, 1, 2)
-            )
+          RunStats(
+            suite = Stat(1, 0, 1),
+            test = Stat(1, 0, 1),
+            assertion = Stat(3, 1, 2)
           )
         )
       }
