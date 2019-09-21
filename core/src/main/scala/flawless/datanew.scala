@@ -186,7 +186,7 @@ sealed trait Suites[F[_]] extends Product with Serializable {
 }
 
 object Suites {
-  def one[F[_]: Applicative](suite: Suite[F]): Suites[F] = One(suite)
+  def one[F[_]](suite: Suite[F]): Suites[F] = One(suite)
 
   def parallel[F[_]: NonEmptyParallel, G[_]](first: Suites[F], rest: Suites[F]*): Suites[F] =
     Sequence[F](NonEmptyList(first, rest.toList), Traversal.parallel)
@@ -234,8 +234,8 @@ object Traversal {
   def parallel[F[_]: NonEmptyParallel]: Traversal[F] = Parallel(NonEmptyParallel[F])
 }
 
-final case class Suite[F[_]](name: String, tests: NonEmptyList[Test[F]]) {
-  def via(f: Test[F] => Test[F]): Suite[F] = Suite(name, tests.map(f))
+final case class Suite[+F[_]](name: String, tests: NonEmptyList[Test[F]]) {
+  def via[F2[a] >: F[a]](f: Test[F] => Test[F2]): Suite[F2] = Suite(name, tests.map(f))
 }
 
 final case class Test[+F[_]](name: String, result: TestRun[F]) {
@@ -296,10 +296,10 @@ object dsl {
         .map(_.toList.toNel.getOrElse(NonEmptyList.one(Assertion.Successful)))
     }
 
-  def pureTest[F[a] >: NoEffect[a]](name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
+  def pureTest(name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[Nothing]] =
     NonEmptyList.one(Test(name, TestRun.Pure(assertions)))
 
-  def lazyTest[F[a] >: NoEffect[a]](name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[F]] =
+  def lazyTest(name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[Nothing]] =
     NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions))))
 
   def assertion(cond: Boolean, ifFalse: String): NonEmptyList[Assertion] = ensure(cond, predicates.all.isTrue(ifFalse))
@@ -307,7 +307,7 @@ object dsl {
   def ensure[A](value: A, predicate: Predicate[A]): NonEmptyList[Assertion] = NonEmptyList.one(predicate(value))
 
   //probably useless
-  def failed[F[a] >: NoEffect[a]](name: String): NonEmptyList[Test[F]] = pureTest[F](name)(NonEmptyList.one(Assertion.Failed("Failed")))
+  def failed[F[a] >: NoEffect[a]](name: String): NonEmptyList[Test[F]] = pureTest(name)(NonEmptyList.one(Assertion.Failed("Failed")))
 }
 
 trait Assertions[F[_]] {
