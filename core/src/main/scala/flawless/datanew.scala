@@ -236,6 +236,7 @@ object Traversal {
 
 final case class Suite[+F[_]](name: String, tests: NonEmptyList[Test[F]]) {
   def via[F2[a] >: F[a]](f: Test[F] => Test[F2]): Suite[F2] = Suite(name, tests.map(f))
+  def toSuites[F2[a] >: F[a]]: Suites[F2] = Suites.one(this)
 }
 
 final case class Test[+F[_]](name: String, result: TestRun[F]) {
