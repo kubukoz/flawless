@@ -22,24 +22,23 @@ object FlawlessTests extends IOApp with TestApp {
     import flawless.data.neu.dsl._
 
     import scala.concurrent.duration._
-
-    Suites.one {
-      suite("Hello world") {
-        tests(
-          test("world") {
-            IO.sleep(10.millis).map { _ =>
-              ensure(1, equalTo(3)) <+> ensure(2, equalTo(2))
-            }
-          },
-          testMonadic[IO]("monadic") { assertions =>
-            for {
-              _ <- assertions.addAll(ensure(1, equalTo(5)))
-              _ <- IO.sleep(200.millis)
-              _ <- assertions.addAll(ensure(2, equalTo(4)))
-            } yield ()
+    val helloSuite = suite("Hello world") {
+      tests(
+        test("world") {
+          IO.sleep(10.millis).map { _ =>
+            ensure(1, equalTo(3)) <+> ensure(2, equalTo(2))
           }
-        )
-      }
+        },
+        testMonadic[IO]("monadic") { assertions =>
+          for {
+            _ <- assertions.addAll(ensure(1, equalTo(5)))
+            _ <- IO.sleep(200.millis)
+            _ <- assertions.addAll(ensure(2, equalTo(4)))
+          } yield ()
+        }
+      )
     }
+
+    Suites.parallel(Suites.one(GetStatsTest.runSuite), Suites.one(helloSuite))
   }
 }
