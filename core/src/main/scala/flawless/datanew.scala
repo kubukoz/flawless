@@ -39,8 +39,6 @@ import cats.effect.Bracket
 import flawless.data.neu.Suites.RResource
 import flawless.data.neu.Assertion.Failed
 import flawless.data.neu.Assertion.Successful
-import flawless.data.neu.TestRun.Pure
-import flawless.data.neu.TestRun.Lazy
 
 ////////////////////////////////////////////////////////
 ////////// interpretation stuff ////////////////////////
