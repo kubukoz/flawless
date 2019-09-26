@@ -21,7 +21,7 @@ val compilerPlugins = List(
 )
 
 val commonSettings = Seq(
-  scalaVersion := "2.12.8",
+  scalaVersion := "2.12.10",
   scalacOptions ++= Options.all,
   name := "flawless",
   libraryDependencies ++= List(
