@@ -6,7 +6,13 @@ Delightful, purely functional testing no-framework.
 
 ## Installation
 
+```sbt
+"com.kubukoz" %% "flawless" % "x.x.x"
+```
+
 ## Usage
+
+`import flawless._`
 
 ## Design
 
