@@ -9,7 +9,7 @@
   - combining tests using Cats operators when convenient, providing necessary Cats instances ✅
 
 - Great UX
-  - Readable, instantaneous output ❌ with colors ✅, pretty printing ✅ (custom typeclass defaulting to cats.Show impl? ❌), file paths ✅
+  - Readable, instantaneous output ✅ with colors ✅, pretty printing ✅ (custom typeclass defaulting to cats.Show impl? ✅ (Diff from diffx)), file paths ✅
 
 - Ran as an app and not using a test runner ✅
   - works with fury by default ✅
@@ -23,3 +23,4 @@
 - Configuration through command-line parameters (?)
   - only
   - except
+  - quick? Would probably require storage backend (file? disk-based db?)
