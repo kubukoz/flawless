@@ -39,6 +39,6 @@ object FlawlessTests extends IOApp with TestApp {
       )
     }
 
-    Suites.parallel(GetStatsTest.runSuite.toSuites, helloSuite.toSuites)
+    GetStatsTest.runSuite.toSuites /* , helloSuite.toSuites */
   }
 }
