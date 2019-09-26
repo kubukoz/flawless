@@ -12,7 +12,9 @@ Delightful, purely functional testing no-framework.
 
 ## Usage
 
-`import flawless._`
+```scala
+import flawless._
+```
 
 ## Design
 
