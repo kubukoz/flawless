@@ -12,7 +12,7 @@ import flawless.data.neu.TestApp
 //test runner for the whole module
 object FlawlessTests extends IOApp with TestApp {
 
-  def run(args: List[String]): IO[ExitCode] = runTests(args) {
+  def run(args: List[String]): IO[ExitCode] = runTests[IO](args) {
     // Suites.parallel(
     // GetStatsTest,
     // VisitTests,
