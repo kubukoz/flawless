@@ -77,8 +77,10 @@ object Interpreter {
           }
 
           reporter.lift(interpreted).map(Sequence(_, Traversal.identity))
-        case One(suite)                                                   => reporter.reportSuite(interpretSuite)(suite).map(One(_))
-        case RResource(suites, implicit0(bracket: Bracket[F, Throwable])) => reporter.lift(suites.use(interpret))
+        case One(suite) => reporter.reportSuite(interpretSuite)(suite).map(One(_))
+        case RResource(suites, b) =>
+          implicit val bracket = b
+          reporter.lift(suites.use(interpret))
       }
 
       val interpret: Suites[F] => F[Suites[Id]] = interpretN.map(reporter.run(_))
@@ -172,9 +174,11 @@ sealed trait Suites[F[_]] extends Product with Serializable {
     * Modifies every suite in this structure with the given function.
     */
   def via(f: Suite[F] => Suite[F]): Suites[F] = this match {
-    case Sequence(suites, traversal)                                 => Sequence(suites.map(_.via(f)), traversal)
-    case One(suite)                                                  => One(f(suite))
-    case RResource(resuites, implicit0(applicative: Applicative[F])) => RResource(resuites.map(_.via(f)), applicative)
+    case Sequence(suites, traversal) => Sequence(suites.map(_.via(f)), traversal)
+    case One(suite)                  => One(f(suite))
+    case RResource(resuites, a) =>
+      implicit val applicative = a
+      RResource(resuites.map(_.via(f)), a)
   }
 
   /**
@@ -212,8 +216,12 @@ object Suites {
   */
 sealed trait Traversal[F[_]] extends Product with Serializable {
   final def traverse[S[_]: NonEmptyTraverse, A, B](as: S[A])(f: A => F[B]): F[S[B]] = this match {
-    case Traversal.Sequential(implicit0(apply: Apply[F]))        => as.nonEmptyTraverse(f)
-    case Traversal.Parallel(implicit0(nep: NonEmptyParallel[F])) => Parallel.parNonEmptyTraverse(as)(f)
+    case Traversal.Sequential(a) =>
+      implicit val apply = a
+      as.nonEmptyTraverse(f)
+    case Traversal.Parallel(nep) =>
+      implicit val parallel = nep
+      Parallel.parNonEmptyTraverse(as)(f)
   }
 
   final def sequence[S[_]: NonEmptyTraverse, A](as: S[F[A]]): F[S[A]] = traverse(as)(identity)
