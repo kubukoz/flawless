@@ -4,7 +4,7 @@ Delightful, purely functional testing no-framework.
 
 [![License](http://img.shields.io/:license-Apache%202-green.svg)](http://www.apache.org/licenses/LICENSE-2.0.txt)
 
- Work in progress
+# Work in progress
 
 This project is a work in progress. Use it at your own responsibility. I expect the API to change quite often for the time being.
 
