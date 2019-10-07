@@ -2,11 +2,11 @@ package flawless.tests
 
 import flawless.stats._
 import cats.implicits._
-import flawless.data.neu.SuiteClass
-import flawless.data.neu.Suite
-import flawless.data.neu.dsl._
-import flawless.data.neu.predicates.all._
 import cats.Id
+import flawless.dsl._
+import flawless.predicates.all._
+import flawless.SuiteClass
+import flawless.data.Suite
 
 object GetStatsTest extends SuiteClass[Nothing] {
   import RunStats.Stat

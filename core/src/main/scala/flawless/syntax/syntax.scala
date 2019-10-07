@@ -1,75 +1,83 @@
-// package flawless
+package flawless
 
-// import cats.Eval
-// import cats.Show
-// import cats.implicits._
-// import cats.data.NonEmptyList
-// import cats.effect.IO
-// import cats.kernel.Eq
-// import cats.kernel.Semigroup
-// import flawless.stats.Location
+import flawless.data._
+import cats.data._
+import cats.effect.Sync
+import cats.effect.concurrent.Ref
+import cats.data.Chain
+import cats.implicits._
+import com.softwaremill.diffx.Diff
+import com.softwaremill.diffx.DiffResult
+import cats.Show
+import cats.Eval
+import cats.Order
 
-// package object syntax {
+object dsl {
+  // Shamelessly ripped off from fs2's Pure type - this is pure genius.
+  type NoEffect[A] <: Nothing
 
-//   def test(name: String)(ftest: IO[Assertions]): Tests[SuiteResult] =
-//     Tests.liftIO(ftest.map(toResult(name, _)))
+  // This name is bad (Predicate implies A => Boolean). Come up with a better name.
+  // Possibly worth newtyping.
+  // This idea is heavily inspired by ZIO Test.
+  type Predicate[-A] = A => Assertion
 
-//   def pureTest(name: String)(assertions: Assertions): Tests[SuiteResult] =
-//     Tests.pure(toResult(name, assertions))
+  def suite[F[_]](name: String)(tests: NonEmptyList[Test[F]]): Suite[F] = new Suite(name, tests)
 
-//   def lazyTest(name: String)(assertions: => Assertions): Tests[SuiteResult] =
-//     test(name)(IO.eval(Eval.later(assertions)))
+  def tests[F[_]](firstTest: NonEmptyList[Test[F]], rest: NonEmptyList[Test[F]]*): NonEmptyList[Test[F]] =
+    NonEmptyList(firstTest, rest.toList).reduce
 
-//   private def toResult(name: String, result: Assertions): SuiteResult =
-//     SuiteResult(NonEmptyList.one(TestResult(name, result)))
+  def test[F[_]](name: String)(assertions: F[NonEmptyList[Assertion]]): NonEmptyList[Test[F]] =
+    NonEmptyList.one(Test(name, TestRun.Eval(assertions)))
 
-//   /*
-//    * If you like to write each test in its own line, this is a handy helper that'll make it possible.
-//    * Instead of combining tests with the semigroup, pass them to this function
-//    * as you would to e.g. the List(...) constructor.
-//    */
-//   def tests[A: Semigroup](first: Tests[A], others: Tests[A]*): Tests[A] =
-//     NonEmptyList(first, others.toList).reduce
+  /**
+    * Provides access to assertions in a monadic fashion.
+    * If no assertions are added, the test completes with a single successful assertion.
+    */
+  def testMonadic[F[_]: Sync](name: String)(assertions: Assertions[F] => F[Unit]): NonEmptyList[Test[F]] =
+    test[F](name) {
+      Ref[F]
+        .of(Chain.empty[Assertion])
+        .flatMap { ref =>
+          assertions(Assertions.refInstance(ref)) *> ref.get
+        }
+        .map(_.toList.toNel.getOrElse(NonEmptyList.one(Assertion.Successful)))
+    }
 
-//   implicit class ShouldBeSyntax[A](private val actual: A) extends AnyVal {
+  def pureTest(name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[Nothing]] =
+    NonEmptyList.one(Test(name, TestRun.Pure(assertions)))
 
-//     def shouldBe(expected: A)(implicit eq: Eq[A], show: Show[A], file: sourcecode.File, line: sourcecode.Line): Assertions = {
-//       val assertion =
-//         if (eq.eqv(actual, expected))
-//           Assertion.Successful
-//         else
-//           Assertion.Failed(
-//             AssertionFailure(
-//               show"""Reason: $actual (actual) wasn't equal to $expected (expected)""",
-//               Location(file.value, line.value)
-//             )
-//           )
+  def lazyTest(name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[Nothing]] =
+    NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions))))
 
-//       Assertions(assertion)
-//     }
-//   }
+  def ensure[A](value: A, predicate: Predicate[A]): NonEmptyList[Assertion] = NonEmptyList.one(predicate(value))
+  def ensureEqual[A: Diff: Show](actual: A, expected: A): NonEmptyList[Assertion] = ensure(actual, predicates.all.equalTo(expected))
+  def assertion(cond: Boolean, ifFalse: String): NonEmptyList[Assertion] = ensure(cond, predicates.all.isTrue(ifFalse))
+}
 
-//   /**
-//     * Import this if you don't give a damn.
-//     * Default instances of type classes that allow you to write some tests quicker.
-//     */
-//   object idgaf {
-//     implicit def anyEq[T]: Eq[T] = Eq.fromUniversalEquals
-//     implicit def anyShow[T]: Show[T] = Show.fromToString
-//   }
+object predicates {
 
-//   object modifiers {
+  object all {
+    import dsl.Predicate
 
-//     def catching(implicit file: sourcecode.File, line: sourcecode.Line): IO[SuiteResult] => IO[SuiteResult] = _.recover {
-//       case e =>
-//         SuiteResult(
-//           NonEmptyList.one(
-//             TestResult(
-//               "Failed",
-//               Assertions(Assertion.Failed(AssertionFailure("An exception was thrown: " + e, Location(file.value, line.value))))
-//             )
-//           )
-//         )
-//     }
-//   }
-// }
+    def greaterThan[A: Order: Show](another: A): Predicate[A] =
+      a => if (a > another) Assertion.Successful else Assertion.Failed(show"$a was not greater than $another")
+
+    def equalTo[T: Diff: Show](another: T): Predicate[T] = {
+      implicit val showDiff: Show[DiffResult] = _.show
+
+      a =>
+        Diff[T].apply(a, another) match {
+          case diff if diff.isIdentical => Assertion.Successful
+          case diff                     => Assertion.Failed(show"$a (actual) was not equal to $another (expected). Diff: $diff")
+        }
+    }
+
+    val successful: Predicate[Any] = _ => Assertion.Successful
+    def failed(message: String): Predicate[Any] = _ => Assertion.Failed(message)
+
+    def isTrue(ifFalse: String): Predicate[Boolean] = {
+      case true  => Assertion.Successful
+      case false => Assertion.Failed(ifFalse)
+    }
+  }
+}

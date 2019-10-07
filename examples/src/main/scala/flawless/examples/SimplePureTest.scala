@@ -1,9 +1,9 @@
 package flawless.examples
 
 import cats.implicits._
-import flawless.data.neu._
-import flawless.data.neu.dsl._
-import flawless.data.neu.predicates.all._
+import flawless.SuiteClass
+import flawless.dsl._
+import flawless.data.Suite
 
 object SimplePureTest extends SuiteClass[Nothing] {
 

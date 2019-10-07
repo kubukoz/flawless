@@ -8,13 +8,11 @@ import cats.data.NonEmptyList
 import monocle.Lens
 import monocle.Traversal
 import monocle.macros.GenLens
-import flawless.data.neu.Suites
 import cats.Id
-import flawless.data.neu.Suite
-import flawless.data.neu.Test
-import flawless.data.neu.Assertion
-import monocle.macros.GenPrism
-import flawless.data.neu.TestRun
+import flawless.data.Suite
+import flawless.data.Test
+import flawless.data.Assertion
+import flawless.data.TestRun
 
 final case class RunStats(suite: RunStats.Stat, test: RunStats.Stat, assertion: RunStats.Stat)
 
@@ -47,16 +45,16 @@ object RunStats {
       case TestRun.Lazy(e) => e.value
     }(e => _ => TestRun.Pure(e))
 
-    private val testAssertions: Lens[Test[Id], NonEmptyList[flawless.data.neu.Assertion]] =
+    private val testAssertions: Lens[Test[Id], NonEmptyList[Assertion]] =
       GenLens[Test[Id]](_.result).composeLens(testRunToAssertions)
 
     val suiteToTests: Traversal[Suite[Id], Test[Id]] =
       suiteTests.composeTraversal(Traversal.fromTraverse)
 
-    val testToAssertions: Traversal[Test[Id], flawless.data.neu.Assertion] =
+    val testToAssertions: Traversal[Test[Id], Assertion] =
       testAssertions.composeTraversal(Traversal.fromTraverse)
 
-    val suiteToAssertions: Traversal[Suite[Id], flawless.data.neu.Assertion] =
+    val suiteToAssertions: Traversal[Suite[Id], Assertion] =
       optics.suiteToTests >>> optics.testToAssertions
   }
 
