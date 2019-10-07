@@ -3,6 +3,7 @@
 Delightful, purely functional testing no-framework.
 
 [![License](http://img.shields.io/:license-Apache%202-green.svg)](http://www.apache.org/licenses/LICENSE-2.0.txt)
+[![Gitter](https://badges.gitter.im/kubukoz/flawless.svg)](https://gitter.im/kubukoz/flawless?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 # Work in progress
 
