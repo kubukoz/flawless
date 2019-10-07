@@ -123,6 +123,7 @@ trait Reporter[F[_], G[_]] {
   def reportSuite: (Suite[F] => G[Suite[Id]]) => Suite[F] => G[Suite[Id]]
 }
 
+
 object Reporter {
   def apply[F[_], G[_]](implicit F: Reporter[F, G]): Reporter[F, G] = F
 
@@ -146,8 +147,8 @@ object Reporter {
           }
     }
 
-  def localStateInstance[F[_]: FlatMap](implicit DC: DeepConsole[Kleisli[F, Depth, ?]]): Reporter[F, Kleisli[F, Depth, ?]] =
-    consoleInstance(Kleisli.liftK, λ[Kleisli[F, Depth, ?] ~> F](_.run(Depth(0))))
+  def localStateInstance[F[_]: FlatMap](implicit DC: DeepConsole[Kleisli[F, Depth, *]]): Reporter[F, Kleisli[F, Depth, *]] =
+    consoleInstance(Kleisli.liftK, λ[Kleisli[F, Depth, *] ~> F](_.run(Depth(0))))
 }
 
 ////////////////////////////////////////////////////////
@@ -202,7 +203,7 @@ object Suites {
   def sequence[F[_]: Apply](suitesSequence: NonEmptyList[Suites[F]]): Suites[F] =
     Sequence[F](suitesSequence, Traversal.sequential)
 
-  def resource[F[_]: Bracket[?[_], Throwable]](suitesInResource: Resource[F, Suites[F]]): Suites[F] =
+  def resource[F[_]: Bracket[*[_], Throwable]](suitesInResource: Resource[F, Suites[F]]): Suites[F] =
     RResource(suitesInResource, Bracket[F, Throwable])
 
   final case class Sequence[F[_]](suites: NonEmptyList[Suites[F]], traversal: Traversal[F]) extends Suites[F]
