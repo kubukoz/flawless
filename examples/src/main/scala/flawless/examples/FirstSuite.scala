@@ -3,25 +3,22 @@ package flawless.examples
 import cats.Id
 import cats.implicits._
 import cats.data.NonEmptyList
-import flawless.Suite
-import flawless.SuiteResult
-import flawless.Tests
+import flawless.data.neu._
+import flawless.data.neu.dsl._
 
-object FirstSuite extends Suite {
+object FirstSuite extends SuiteClass[Nothing] {
   val service: MyService[Id] = MyService.instance
 
-  import flawless.syntax._
-
-  override val runSuite: Tests[SuiteResult] = {
+  override val runSuite: Suite[Nothing] = suite("FirstSuite") {
     pureTest("job(1) and (2)")(
-      service.job(1).shouldBe("I got 1 problems but a test ain't one") |+|
-        service.job(2).shouldBe("I got 2 problems but a test ain't one")
+      ensureEqual(service.job(1), "I got 1 problems but a test ain't one") |+|
+        ensureEqual(service.job(2), "I got 2 problems but a test ain't one")
     ) |+|
       pureTest("job(1-1000)")(
         NonEmptyList(1, (2 to 1000).toList).reduceMap { n =>
           val result = service.job(n)
-          result.shouldBe(show"I got $n problems but a test ain't one") |+|
-            result.contains("500").shouldBe(false)
+          ensureEqual(result, show"I got $n problems but a test ain't one") |+|
+            ensureEqual(result.contains("500"), false)
         }
       )
   }

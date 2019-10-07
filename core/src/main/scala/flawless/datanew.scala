@@ -190,11 +190,17 @@ sealed trait Suites[F[_]] extends Product with Serializable {
 object Suites {
   def one[F[_]](suite: Suite[F]): Suites[F] = One(suite)
 
-  def parallel[F[_]: NonEmptyParallel, G[_]](first: Suites[F], rest: Suites[F]*): Suites[F] =
-    Sequence[F](NonEmptyList(first, rest.toList), Traversal.parallel)
+  def parallel[F[_]: NonEmptyParallel](first: Suites[F], rest: Suites[F]*): Suites[F] =
+    parSequence(NonEmptyList(first, rest.toList))
+
+  def parSequence[F[_]: NonEmptyParallel](suitesSequence: NonEmptyList[Suites[F]]): Suites[F] =
+    Sequence[F](suitesSequence, Traversal.parallel)
 
   def sequential[F[_]: Apply](first: Suites[F], rest: Suites[F]*): Suites[F] =
-    Sequence[F](NonEmptyList(first, rest.toList), Traversal.sequential)
+    sequence(NonEmptyList(first, rest.toList))
+
+  def sequence[F[_]: Apply](suitesSequence: NonEmptyList[Suites[F]]): Suites[F] =
+    Sequence[F](suitesSequence, Traversal.sequential)
 
   def resource[F[_]: Bracket[?[_], Throwable]](suitesInResource: Resource[F, Suites[F]]): Suites[F] =
     RResource(suitesInResource, Bracket[F, Throwable])
@@ -393,7 +399,7 @@ class NeuExample[F[_]: Timer: Sync] {
 }
 
 // todo better name
-trait SuiteClass[F[_]] {
+trait SuiteClass[+F[_]] {
   def runSuite: Suite[F]
 }
 
