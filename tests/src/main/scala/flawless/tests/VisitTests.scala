@@ -1,4 +1,6 @@
 package flawless.tests
+
+object VisitTests
 /*
 import cats.implicits._
 import cats.data.NonEmptyList
