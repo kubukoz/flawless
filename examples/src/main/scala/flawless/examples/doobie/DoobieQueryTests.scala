@@ -1,10 +1,11 @@
 package flawless.examples.doobie
 
-import flawless.data.neu._
-import flawless.data.neu.dsl._
+import flawless.data._
+import flawless.data.dsl._
 import doobie.Transactor
 import cats.effect.IO
 import cats.implicits._
+import flawless.SuiteClass
 
 final class DoobieQueryTests(xa: Transactor[IO]) extends SuiteClass[IO] {
 

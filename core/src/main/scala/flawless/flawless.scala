@@ -5,12 +5,11 @@ import cats.Id
 
 package object flawless {
   import cats.FlatMap
-  import flawless.data.neu.Test
+  import flawless.data.Test
   import cats.Monad
   import cats.Applicative
   import cats.effect.ConsoleOut
-  import flawless.data.neu.Interpreter
-  import flawless.data.neu.Suites
+  import flawless.data.Suites
 
   def loadArgs[F[_]: Applicative](args: List[String]): F[Unit] = {
     val _ = args
@@ -44,7 +43,7 @@ package object flawless {
         else inRed(show"Failed: ${test.name}")
 
       val failedAssertions = assertions.toList.collect {
-        case flawless.data.neu.Assertion.Failed(failure) =>
+        case flawless.data.Assertion.Failed(failure) =>
           inRed(
             // show"${failure.text} (${failure.location})"
             failure //todo

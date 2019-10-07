@@ -7,14 +7,14 @@ import cats.data.OptionT
 import cats.effect.ExitCode
 import cats.effect.IO
 import cats.effect.IOApp
-import flawless.data.neu._
+import flawless.data._
 import flawless._
 import flawless.examples.doobie.DoobieQueryTests
 import _root_.doobie.util.ExecutionContexts
 import _root_.doobie.hikari.HikariTransactor
 import cats.Foldable
 import cats.effect.Blocker
-import flawless.data.neu.TestApp
+import flawless.TestApp
 import cats.effect.Resource
 import fs2.Pipe
 import cats.implicits._

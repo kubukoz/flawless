@@ -3,8 +3,9 @@ package flawless.examples
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.implicits._
-import flawless.data.neu._
-import flawless.data.neu.dsl._
+import flawless.dsl._
+import flawless.SuiteClass
+import flawless.data.Suite
 
 object IOSuite extends SuiteClass[IO] {
 

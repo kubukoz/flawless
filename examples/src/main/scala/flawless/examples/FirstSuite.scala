@@ -3,8 +3,9 @@ package flawless.examples
 import cats.Id
 import cats.implicits._
 import cats.data.NonEmptyList
-import flawless.data.neu._
-import flawless.data.neu.dsl._
+import flawless.dsl._
+import flawless.SuiteClass
+import flawless.data.Suite
 
 object FirstSuite extends SuiteClass[Nothing] {
   val service: MyService[Id] = MyService.instance
