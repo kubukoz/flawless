@@ -6,19 +6,17 @@ import cats.data.NonEmptyList
 import cats.effect.ExitCode
 import cats.effect.IO
 import cats.effect.IOApp
-import cats.implicits._
+import flawless.data.neu._
 import flawless._
 import flawless.examples.doobie.DoobieQueryTests
 import _root_.doobie.util.ExecutionContexts
 import _root_.doobie.hikari.HikariTransactor
-import cats.effect.Console.io._
-import fs2.Pipe
-import cats.data.OptionT
 import cats.effect.Blocker
+import flawless.data.neu.TestApp
+import cats.effect.Resource
 
-object ExampleTests extends IOApp {
-  import flawless.syntax._
-
+object ExampleTests extends IOApp with TestApp {
+  /*
   //flaky test detector
   def deflake(maxRetries: Option[Long] = Some(10000L)): IO[SuiteResult] => IO[SuiteResult] =
     io => {
@@ -48,6 +46,7 @@ object ExampleTests extends IOApp {
         else OptionT(findFirstFailure).getOrElse(firstResult)
       }
     }
+   */
 
   val sequentialTests = NonEmptyList.of(
     FirstSuite,
@@ -60,7 +59,7 @@ object ExampleTests extends IOApp {
     IOSuite
   )
 
-  val dbTests = {
+  val dbTests: Resource[IO, NonEmptyList[Suites[IO]]] = {
     for {
       connectEc <- ExecutionContexts.fixedThreadPool[IO](10)
       blocker   <- Blocker[IO]
@@ -72,25 +71,25 @@ object ExampleTests extends IOApp {
         connectEc,
         blocker
       )
-    } yield NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor).runSuite))
+    } yield NonEmptyList.fromListUnsafe(List.fill(10)(new DoobieQueryTests(transactor).runSuite.toSuites))
   }
 
-  val runSequentials = (
-    Tests.parSequence(sequentialTests.map(_.runSuite))
-      |+| Tests.resource(dbTests).use(Tests.parSequence(_)).combineN(2)
+  val runSequentials = Suites.sequential(
+    Suites.parSequence(sequentialTests.map(_.runSuite.toSuites)),
+    Suites.resource(dbTests.map(Suites.parSequence(_)))
   )
 
-  val runFlaky = FlakySuite.runSuite.map(NonEmptyList.one)
+  val runFlaky = FlakySuite.runSuite.toSuites
 
   val runExpensives =
-    Tests.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
+    Suites.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite.toSuites: Suites[IO]))
 
-  val runParallels = Tests.parSequence(parallelTests.map(_.runSuite))
+  val runParallels = Suites.parSequence(parallelTests.map(_.runSuite.toSuites))
 
-  val testRange = runFlaky |+| runExpensives |+| runParallels |+| runSequentials
+  val testRange = Suites.sequential(runFlaky, runExpensives, runParallels, runSequentials)
 
   override def run(args: List[String]): IO[ExitCode] =
     runTests(args)(
-      testRange.via(deflake()).via(modifiers.catching)
+      testRange //.via(deflake()).via(modifiers.catching)
     )
 }

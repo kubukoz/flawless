@@ -1,14 +1,11 @@
 package flawless.examples
 
 import cats.data.NonEmptyList
-import flawless.Suite
-import flawless.SuiteResult
-import flawless.Tests
+import flawless.data.neu._
+import flawless.data.neu.dsl._
 import cats.implicits._
 
-object ExpensiveSuite extends Suite {
-  import flawless.syntax._
-
+object ExpensiveSuite extends SuiteClass[Nothing] {
   private def fib(n: Long): Long = {
     def go(a: Long, b: Long, n: Long): Long =
       if (n > 0)
@@ -18,7 +15,7 @@ object ExpensiveSuite extends Suite {
     go(1, 1, n - 2)
   }
 
-  val runSuite: Tests[SuiteResult] = {
+  val runSuite: Suite[Nothing] = suite("ExpensiveSuite") {
     tests(
       lazyTest("fib(1-8)") {
         NonEmptyList
@@ -31,11 +28,11 @@ object ExpensiveSuite extends Suite {
             6L -> 8L
           )
           .reduceMap {
-            case (x, y) => fib(x) shouldBe y
+            case (x, y) => ensureEqual(fib(x), y)
           }
       },
       lazyTest("fib(Int.MaxValue)") {
-        fib(Int.MaxValue.toLong) shouldBe 6798988702295324957L
+        ensureEqual(fib(Int.MaxValue.toLong), 6798988702295324957L)
       }
     )
   }

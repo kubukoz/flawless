@@ -1,16 +1,18 @@
 package flawless.examples
 
 import cats.effect.IO
-import flawless.{Suite, SuiteResult, Tests}
 
 import scala.util.Random
 import cats.implicits._
+import flawless.data.neu._
+import flawless.data.neu.dsl._
 
-object FlakySuite extends Suite {
-  import flawless.syntax._
+object FlakySuite extends SuiteClass[IO] {
   private val flaky = IO(Random.nextInt(10000)).map(_ =!= 0)
 
-  val runSuite: Tests[SuiteResult] = test("random(10000) =!= 0") {
-    flaky.map(_ shouldBe true)
-  }.combineN(2)
+  val runSuite: Suite[IO] = suite("FlakySuite") {
+    test("random(10000) =!= 0") {
+      flaky.map(ensureEqual(_, false))
+    }.combineN(2)
+  }
 }
