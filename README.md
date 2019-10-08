@@ -24,3 +24,9 @@ import flawless._
 ## Design
 
 See [design doc](DESIGN.md)
+
+## Adoption
+
+- [runaid/runaid](https://github.com/runaid/runaid)
+- [kubukoz/datas](https://github.com/kubukoz/datas)
+- [flawless itself](tests/src/main/scala/flawless/tests)
