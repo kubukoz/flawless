@@ -1,7 +1,7 @@
 package flawless.examples.doobie
 
 import flawless.data._
-import flawless.data.dsl._
+import flawless.dsl._
 import doobie.Transactor
 import cats.effect.IO
 import cats.implicits._

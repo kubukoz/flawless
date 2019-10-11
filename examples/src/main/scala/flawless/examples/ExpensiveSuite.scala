@@ -1,7 +1,9 @@
 package flawless.examples
 
 import cats.data.NonEmptyList
-import flawless.data.dsl._
+import flawless.dsl._
+import flawless.SuiteClass
+import flawless.data.Suite
 import cats.implicits._
 
 object ExpensiveSuite extends SuiteClass[Nothing] {
