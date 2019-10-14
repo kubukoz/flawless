@@ -32,7 +32,7 @@ val commonSettings = Seq(
     "dev.profunktor" %% "console4cats" % "0.8.0",
     "com.lihaoyi" %% "sourcecode" % "0.1.7",
     "com.lihaoyi" %% "pprint" % "0.5.5", //todo temporary
-    "com.softwaremill.diffx" %% "diffx-core" % "0.3.5"
+    "com.softwaremill.diffx" %% "diffx-core" % "0.3.7"
   ) ++ compilerPlugins
 )
 
