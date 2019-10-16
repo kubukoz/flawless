@@ -5,32 +5,23 @@ import flawless.data.Suite
 import flawless.dsl._
 import cats.implicits._
 import flawless.Reporter
-import flawless.DeepConsole
-import flawless.DeepConsole.Depth
 import cats.effect.ConsoleOut
 import cats.data.Writer
-import cats.data.ReaderT
 import cats.data.Chain
-import cats.mtl.instances.all._
 import flawless.Interpreter
 import cats.Show
 
 object ReporterTest extends SuiteClass[NoEffect] {
   type WC[A] = Writer[Chain[String], A]
 
-  type RWC[A] = ReaderT[Writer[Chain[String], ?], Depth, A]
-
-  implicit val cout: ConsoleOut[RWC] = new ConsoleOut[RWC] {
-    def putStr[A: Show](a: A): RWC[Unit] = ReaderT.liftF(Writer.tell(Chain(a.show)))
-    def putStrLn[A: Show](a: A): RWC[Unit] = ReaderT.liftF(Writer.tell(Chain(show"$a\n")))
+  implicit val cout: ConsoleOut[WC] = new ConsoleOut[WC] {
+    def putStr[A: Show](a: A): WC[Unit] = Writer.tell(Chain(a.show))
+    def putStrLn[A: Show](a: A): WC[Unit] = Writer.tell(Chain(show"$a\n"))
   }
 
-  implicit val dc: DeepConsole[RWC] =
-    DeepConsole.instance[RWC]
+  implicit val reporter: Reporter[WC] = Reporter.consoleInstance[WC]
 
-  implicit val reporter: Reporter[WC, RWC] = Reporter.localStateInstance[WC]
-
-  val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC, RWC]
+  val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
 
   val runSuite: Suite[NoEffect] = suite("ReporterTest") {
     tests(
