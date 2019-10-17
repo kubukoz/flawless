@@ -25,8 +25,8 @@ package object flawless {
 
     val stats = RunStats.fromSuites(suitesFlat)
 
-    val weGood = stats.suite.failed === 0
-    val exit   = if (weGood) ExitCode.Success else ExitCode.Error
+    val weGood = stats.suite.failed.isEmpty
+    val exit = if (weGood) ExitCode.Success else ExitCode.Error
 
     def inGreen(s: String): String =
       AnsiColor.GREEN + s + AnsiColor.RESET
@@ -40,11 +40,10 @@ package object flawless {
       val successful = assertions.forall(_.isSuccessful)
       val testName =
         if (successful) inGreen(show"Passed: ${test.name}")
-        else inRed(show"Failed: ${test.name}")
+        else inRed(test.addExtras(show"Failed: ${test.name}"))
 
       val failedAssertions = assertions.toList.collect {
-        case flawless.data.Assertion.Failed(failure) =>
-          inRed(test.addExtras(failure))
+        case flawless.data.Assertion.Failed(failure) => inRed(failure)
       }
 
       testName + (if (!successful) failedAssertions.mkString("\n", "\n", "\n") else "")

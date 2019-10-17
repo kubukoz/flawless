@@ -30,7 +30,7 @@ object ReporterTest extends SuiteClass[NoEffect] {
         val testedSuite = suite("suite 1") {
           tests(
             test[WC]("test 1")(ensureEqual(1, 1).pure[WC]),
-            test[WC]("test 2")(ensureEqual(1, 1).pure[WC])
+            test[WC]("test 2")(ensureEqual(1, 2).pure[WC])
           )
         }.toSuites
 

@@ -23,7 +23,7 @@ object GetStatsTest extends SuiteClass[NoEffect] {
         ensureEqual(
           RunStats.fromSuites(List(input)),
           RunStats(
-            suite = Stat(1, 1, 0),
+            suite = Stat(1, 1, 10 /* todo */ ),
             test = Stat(1, 1, 0),
             assertion = Stat(1, 1, 0)
           )

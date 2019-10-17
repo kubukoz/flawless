@@ -11,7 +11,7 @@ import flawless.data.Suites
 object FlawlessTests extends IOApp with TestApp {
 
   def run(args: List[String]): IO[ExitCode] = runTests[IO](args) {
-    Suites.sequential(
+    Suites.parallel(
       GetStatsTest.runSuite.toSuites,
       ReporterTest.runSuite.toSuites
     )

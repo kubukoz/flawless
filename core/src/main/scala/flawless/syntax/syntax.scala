@@ -15,18 +15,18 @@ import cats.Order
 sealed trait NoDeps
 
 object NoDeps {
-  implicit val trivial: NoDeps    = new NoDeps {}
+  implicit val trivial: NoDeps = new NoDeps {}
   implicit val show: Show[NoDeps] = _ => ""
 }
 
 final case class Location(file: String, line: Int)
 
 object Location {
-  implicit val show: Show[Location]                                                            = l => show" | at: ${l.file}:${l.line}"
+  implicit val show: Show[Location] = l => show" | at: ${l.file}:${l.line}"
   implicit def fromSourceCode(implicit file: sourcecode.File, line: sourcecode.Line): Location = Location(file.value, line.value)
 }
 
-object dsl       extends anydsl[NoDeps]
+object dsl extends anydsl[NoDeps]
 object locations extends anydsl[Location]
 
 trait anydsl[-CallsiteDeps] {
@@ -62,16 +62,20 @@ trait anydsl[-CallsiteDeps] {
 
   def pureTest[Deps <: CallsiteDeps: Show](
     name: String
-  )(assertions: NonEmptyList[Assertion])(implicit deps: Deps, showDeps: Show[Deps]): NonEmptyList[Test[Nothing]] = {
+  )(
+    assertions: NonEmptyList[Assertion]
+  )(
+    implicit deps: Deps,
+    showDeps: Show[Deps]
+  ): NonEmptyList[Test[Nothing]] =
     NonEmptyList.one(Test(name, TestRun.Pure(assertions), _ + showDeps.show(deps)))
-  }
 
   def lazyTest(name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[Nothing]] =
     NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions)), identity))
 
-  def ensure[A](value: A, predicate: Predicate[A]): NonEmptyList[Assertion]       = NonEmptyList.one(predicate(value))
+  def ensure[A](value: A, predicate: Predicate[A]): NonEmptyList[Assertion] = NonEmptyList.one(predicate(value))
   def ensureEqual[A: Diff: Show](actual: A, expected: A): NonEmptyList[Assertion] = ensure(actual, predicates.all.equalTo(expected))
-  def assertion(cond: Boolean, ifFalse: String): NonEmptyList[Assertion]          = ensure(cond, predicates.all.isTrue(ifFalse))
+  def assertion(cond: Boolean, ifFalse: String): NonEmptyList[Assertion] = ensure(cond, predicates.all.isTrue(ifFalse))
 }
 
 object predicates {
@@ -88,11 +92,13 @@ object predicates {
       a =>
         Diff[T].apply(a, another) match {
           case diff if diff.isIdentical => Assertion.Successful
-          case diff                     => Assertion.Failed(show"$a (actual) was not equal to $another (expected). Diff: $diff")
+          case diff =>
+            Assertion.Failed(show"""$a (actual) was not equal to $another (expected).
+                                   |Diff: $diff""".stripMargin)
         }
     }
 
-    val successful: Predicate[Any]              = _ => Assertion.Successful
+    val successful: Predicate[Any] = _ => Assertion.Successful
     def failed(message: String): Predicate[Any] = _ => Assertion.Failed(message)
 
     def isTrue(ifFalse: String): Predicate[Boolean] = {

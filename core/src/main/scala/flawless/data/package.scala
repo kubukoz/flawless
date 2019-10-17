@@ -79,7 +79,7 @@ object Suites {
   def flatten(suites: Suites[Id]): NonEmptyList[Suite[Id]] = suites match {
     case Sequence(suites, _) => suites.flatMap(flatten)
     case One(suite)          => suite.pure[NonEmptyList]
-    case RResource(_, _)     => throw new AssertionError("Impossible")
+    case RResource(_, _)     => throw new AssertionError("Impossible: Bracket[Id, Throwable]")
   }
 }
 
@@ -91,6 +91,7 @@ sealed trait Traversal[F[_]] extends Product with Serializable {
     case Traversal.Sequential(a) =>
       implicit val apply = a
       as.nonEmptyTraverse(f)
+
     case Traversal.Parallel(nep) =>
       implicit val parallel = nep
       Parallel.parNonEmptyTraverse(as)(f)
