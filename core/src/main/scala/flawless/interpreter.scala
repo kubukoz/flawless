@@ -14,9 +14,9 @@ import flawless.data.Test
 import flawless.data.Assertion
 import flawless.data.TestRun
 import flawless.data.Suite
-import flawless.data.Traversal
 import cats.tagless.finalAlg
 import cats.effect.ConsoleOut
+import Interpreter.InterpretOne
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -24,13 +24,16 @@ trait Interpreter[F[_]] {
   /**
     * Interprets the test structure to the underlying effect. This is where all the actualy execution happens.
     */
-  def interpret: Suites[F] => F[Suites[Id]]
+  def interpret: InterpretOne[Suites, F]
 }
 
 object Interpreter {
+  //A type alias for an action that interprets a single instance of Algebra (e.g. suite or test)
+  type InterpretOne[Algebra[_[_]], F[_]] = Algebra[F] => F[Algebra[Id]]
+
   implicit def defaultInterpreter[F[_]: Monad: Reporter]: Interpreter[F] =
     new Interpreter[F] {
-      private val interpretTest: Test[F] => F[Test[Id]] = { test =>
+      private val interpretTest: InterpretOne[Test, F] = { test =>
         def finish(results: NonEmptyList[Assertion]): Test[Id] = Test(test.name, TestRun.Pure(results))
 
         test.result match {
@@ -41,54 +44,48 @@ object Interpreter {
         }
       }
 
-      //todo tests in a suite should have multiple methods of traversal
-      private val interpretSuite: Suite[F] => F[Suite[Id]] = suite =>
+      private val interpretSuite: InterpretOne[Suite, F] = suite =>
         suite.tests.nonEmptyTraverse(Reporter[F].reportTest(interpretTest)).map(Suite[Id](suite.name, _))
 
-      val interpret: Suites[F] => F[Suites[Id]] = {
-        case Sequence(suites, traversal) =>
-          val interpreted = traversal.traverse(suites) {
-            //this interpret call will make sure every spec starts with a clean depth scope - watch this space
-            interpret
-          }
-
-          interpreted.map(Sequence(_, Traversal.identity))
-        case One(suite) => Reporter[F].reportSuite(interpretSuite)(suite).map(One(_))
-        case RResource(suites, b) =>
-          implicit val bracket = b
-          suites.use(interpret)
+      val interpret: InterpretOne[Suites, F] = {
+        case Sequence(suites, traversal) => traversal.traverse(suites)(interpret).map(Suites.sequence(_))
+        case One(suite)                  => Reporter[F].reportSuite(interpretSuite)(suite).map(One(_))
+        case RResource(suites, bracket)  => suites.use(interpret)(bracket)
       }
     }
 }
 
 @finalAlg
 trait Reporter[F[_]] {
-  def reportTest: (Test[F] => F[Test[Id]]) => Test[F] => F[Test[Id]]
-  def reportSuite: (Suite[F] => F[Suite[Id]]) => Suite[F] => F[Suite[Id]]
+  def reportTest: InterpretOne[Test, F] => InterpretOne[Test, F]
+  def reportSuite: InterpretOne[Suite, F] => InterpretOne[Suite, F]
 }
 
 object Reporter {
 
   def consoleInstance[F[_]: FlatMap: ConsoleOut]: Reporter[F] =
     new Reporter[F] {
-
       private def putStrWithDepth(depth: Int): String => F[Unit] = s => ConsoleOut[F].putStrLn(" " * depth * 2 + s)
 
       private val putSuite = ConsoleOut[F].putStrLn(_: String)
       private val putTest = putStrWithDepth(1)
 
-      val reportTest: (Test[F] => F[Test[Id]]) => Test[F] => F[Test[Id]] = run =>
+      //this is going to need access to a summarizer of tests,
+      //so that it can display the amount of assertions that succeeded, failed, etc., with colors
+      val reportTest: (Test[F] => F[Test[Id]]) => Test[F] => F[Test[Id]] = interpret =>
         test =>
-          //this is going to need access to a summarizer of tests,
-          //so that it can display the amount of assertions that succeeded, failed, etc., with colors
-          putTest("Starting test: " + test.name) *> run(test).flatTap { result =>
-            putTest("Finished test: " + test.name + s", result: ${result.result}")
-          }
+          for {
+            _      <- putTest("Starting test: " + test.name)
+            result <- interpret(test)
+            _      <- putTest("Finished test: " + test.name + s", result: ${result.result}")
+          } yield result
 
-      val reportSuite: (Suite[F] => F[Suite[Id]]) => Suite[F] => F[Suite[Id]] = run =>
+      val reportSuite: (Suite[F] => F[Suite[Id]]) => Suite[F] => F[Suite[Id]] = interpret =>
         suite =>
-          putSuite("Starting suite: " + suite.name) *> run(suite).flatTap { result =>
-            putSuite("Finished suite: " + suite.name + s", result: ${result.tests}")
-          }
+          for {
+            _      <- putSuite("Starting suite: " + suite.name)
+            result <- interpret(suite)
+            _      <- putSuite("Finished suite: " + suite.name + s", result: ${result.tests}")
+          } yield result
     }
 }
