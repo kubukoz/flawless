@@ -25,6 +25,7 @@ val commonSettings = Seq(
   scalacOptions ++= Options.all,
   name := "flawless",
   libraryDependencies ++= List(
+    "org.typelevel" %% "simulacrum" % "1.0.0",
     "org.typelevel" %% "cats-tagless-macros" % "0.10",
     "com.github.julien-truffaut" %% "monocle-macro" % "2.0.0",
     "org.typelevel" %% "cats-effect" % "2.0.0",
@@ -39,11 +40,7 @@ val noPublish = Seq(skip in publish := true)
 val core = project.settings(commonSettings).settings(name += "-core")
 
 val tests =
-  project
-    .settings(commonSettings)
-    .settings(name += "-tests")
-    .settings(noPublish)
-    .dependsOn(core)
+  project.settings(commonSettings).settings(name += "-tests").settings(noPublish).dependsOn(core)
 
 val examples =
   project
@@ -59,8 +56,4 @@ val examples =
     .dependsOn(core)
 
 val flawless =
-  project
-    .in(file("."))
-    .settings(commonSettings)
-    .settings(noPublish)
-    .aggregate(core, examples, tests)
+  project.in(file(".")).settings(commonSettings).settings(noPublish).aggregate(core, examples, tests)

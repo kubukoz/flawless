@@ -11,7 +11,7 @@ import flawless.data.Suite
 object GetStatsTest extends SuiteClass[NoEffect] {
   import RunStats.Stat
 
-  val runSuite: Suite[NoEffect] = suite("GetStatsTest") {
+  val runSuite: Suite[NoEffect] = suite(autoLabel) {
     tests(
       pureTest("1 test: 1 succ / 0 fail") {
         val input = suite[Id]("foo") {
