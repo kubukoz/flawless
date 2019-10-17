@@ -117,10 +117,10 @@ final case class Suite[+F[_]](name: String, tests: NonEmptyList[Test[F]]) {
   def toSuites[F2[a] >: F[a]]: Suites[F2] = Suites.one(this)
 }
 
-final case class Test[+F[_]](name: String, result: TestRun[F]) {
+final case class Test[+F[_]](name: String, result: TestRun[F], addExtras: String => String) {
   //Maybe use via in interpreter?
   //todo add ability for `via` to run effects (think modifyF from monocle)
-  def via[G[_]](f: TestRun[F] => TestRun[G]): Test[G] = Test(name, f(result))
+  def via[G[_]](f: TestRun[F] => TestRun[G]): Test[G] = Test(name, f(result), addExtras)
 }
 
 sealed trait TestRun[+F[_]] extends Product with Serializable {

@@ -34,7 +34,7 @@ object Interpreter {
   implicit def defaultInterpreter[F[_]: Monad: Reporter]: Interpreter[F] =
     new Interpreter[F] {
       private val interpretTest: InterpretOne[Test, F] = { test =>
-        def finish(results: NonEmptyList[Assertion]): Test[Id] = Test(test.name, TestRun.Pure(results))
+        def finish(results: NonEmptyList[Assertion]): Test[Id] = Test(test.name, TestRun.Pure(results), test.addExtras)
 
         test.result match {
           //this is a GADT skolem - you think I'd know what that means by now...
@@ -77,7 +77,7 @@ object Reporter {
           for {
             _      <- putTest("Starting test: " + test.name)
             result <- interpret(test)
-            _      <- putTest("Finished test: " + test.name + s", result: ${result.result}")
+            _      <- putTest("Finished test: " + test.name)
           } yield result
 
       val reportSuite: (Suite[F] => F[Suite[Id]]) => Suite[F] => F[Suite[Id]] = interpret =>
@@ -85,7 +85,7 @@ object Reporter {
           for {
             _      <- putSuite("Starting suite: " + suite.name)
             result <- interpret(suite)
-            _      <- putSuite("Finished suite: " + suite.name + s", result: ${result.tests}")
+            _      <- putSuite("Finished suite: " + suite.name)
           } yield result
     }
 }
