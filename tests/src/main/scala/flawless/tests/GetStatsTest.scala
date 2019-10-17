@@ -3,7 +3,7 @@ package flawless.tests
 import flawless.stats._
 import cats.implicits._
 import cats.Id
-import flawless.dsl._
+import flawless.locations._
 import flawless.predicates.all._
 import flawless.SuiteClass
 import flawless.data.Suite

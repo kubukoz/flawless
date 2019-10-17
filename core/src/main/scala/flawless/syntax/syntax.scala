@@ -12,7 +12,22 @@ import cats.Show
 import cats.Eval
 import cats.Order
 
-object dsl {
+sealed trait NoDeps
+
+object NoDeps {
+  implicit val trivial: NoDeps = new NoDeps {}
+}
+
+final case class Location(file: String, line: Int)
+
+object Location {
+  implicit def fromSourceCode(implicit file: sourcecode.File, line: sourcecode.Line): Location = Location(file.value, line.value)
+}
+
+object dsl extends anydsl[NoDeps]
+object locations extends anydsl[Location]
+
+trait anydsl[-CallsiteDeps] {
   // Shamelessly ripped off from fs2's Pure type - this is pure genius.
   type NoEffect[A] <: Nothing
 
@@ -43,8 +58,10 @@ object dsl {
         .map(_.toList.toNel.getOrElse(NonEmptyList.one(Assertion.Successful)))
     }
 
-  def pureTest(name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[Nothing]] =
+  def pureTest(name: String)(assertions: NonEmptyList[Assertion])(implicit deps: CallsiteDeps): NonEmptyList[Test[Nothing]] = {
+    println(deps)
     NonEmptyList.one(Test(name, TestRun.Pure(assertions)))
+  }
 
   def lazyTest(name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[Nothing]] =
     NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions))))
