@@ -8,10 +8,10 @@ import flawless.predicates.all._
 import flawless.SuiteClass
 import flawless.data.Suite
 
-object GetStatsTest extends SuiteClass[Nothing] {
+object GetStatsTest extends SuiteClass[NoEffect] {
   import RunStats.Stat
 
-  val runSuite: Suite[Nothing] = suite("GetStatsTest") {
+  val runSuite: Suite[NoEffect] = suite("GetStatsTest") {
     tests(
       pureTest("1 test: 1 succ / 0 fail") {
         val input = suite[Id]("foo") {
