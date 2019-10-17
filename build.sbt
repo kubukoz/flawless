@@ -26,12 +26,10 @@ val commonSettings = Seq(
   name := "flawless",
   libraryDependencies ++= List(
     "org.typelevel" %% "cats-tagless-macros" % "0.10",
-    "org.typelevel" %% "cats-mtl-core" % "0.7.0",
     "com.github.julien-truffaut" %% "monocle-macro" % "2.0.0",
     "org.typelevel" %% "cats-effect" % "2.0.0",
     "dev.profunktor" %% "console4cats" % "0.8.0",
     "com.lihaoyi" %% "sourcecode" % "0.1.7",
-    "com.lihaoyi" %% "pprint" % "0.5.5", //todo temporary
     "com.softwaremill.diffx" %% "diffx-core" % "0.3.7"
   ) ++ compilerPlugins
 )
