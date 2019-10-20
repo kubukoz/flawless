@@ -33,6 +33,7 @@ object Interpreter {
 
   implicit def defaultInterpreter[F[_]: Monad: Reporter]: Interpreter[F] =
     new Interpreter[F] {
+
       private val interpretTest: InterpretOne[Test, F] = { test =>
         def finish(results: NonEmptyList[Assertion]): Test[Id] = Test(test.name, TestRun.Pure(results))
 

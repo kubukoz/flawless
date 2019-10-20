@@ -14,13 +14,20 @@ inThisBuild(
   )
 )
 
-val compilerPlugins = List(
-  compilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0").cross(CrossVersion.full),
-  compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
-)
+def is213(scalaVersion: String): Boolean = scalaVersion.startsWith("2.13")
+
+def compilerPlugins(scalaVersion: String) =
+  List(
+    compilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0").cross(CrossVersion.full),
+    compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+  ) ++ (if (is213(scalaVersion))
+          Seq()
+        else Seq(compilerPlugin(("org.scalamacros" % "paradise" % "2.1.1").cross(CrossVersion.full))))
 
 val commonSettings = Seq(
   scalaVersion := "2.12.10",
+  crossScalaVersions := Seq("2.12.10", "2.13.1"),
+  scalacOptions ++= (if (is213(scalaVersion.value)) Seq("-Ymacro-annotations") else Seq()),
   name := "flawless",
   libraryDependencies ++= List(
     "org.typelevel" %% "cats-tagless-macros" % "0.10",
@@ -29,7 +36,7 @@ val commonSettings = Seq(
     "dev.profunktor" %% "console4cats" % "0.8.0",
     "com.lihaoyi" %% "sourcecode" % "0.1.7",
     "com.softwaremill.diffx" %% "diffx-core" % "0.3.8"
-  ) ++ compilerPlugins
+  ) ++ compilerPlugins(scalaVersion.value)
 )
 
 val noPublish = Seq(skip in publish := true)

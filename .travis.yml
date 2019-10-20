@@ -1,6 +1,7 @@
 language: scala
 scala:
 - 2.12.8
+- 2.13.1
 cache:
   directories:
     - $HOME/.sbt/1.0/dependency
@@ -24,7 +25,7 @@ jobs:
   include:
   # stage="test" if no stage is specified
   - script:
-    - sbt tests/compile tests/run
+    - sbt ++$TRAVIS_SCALA_VERSION tests/compile examples/compile tests/run
   # run ci-release only if previous stages passed
   - stage: release
     script: sbt ci-release
