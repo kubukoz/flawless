@@ -12,8 +12,8 @@ object FirstSuite extends SuiteClass[Nothing] {
 
   override val runSuite: Suite[Nothing] = suite("FirstSuite") {
     pureTest("job(1) and (2)")(
-      ensureEqual(service.job(1), "I got 1 problems but a test ain't one") |+|
-        ensureEqual(service.job(2), "I got 2 problems but a test ain't one")
+      ensureEqual[String](service.job(1), "I got 1 problems but a test ain't one") |+|
+        ensureEqual[String](service.job(2), "I got 2 problems but a test ain't one")
     ) |+|
       pureTest("job(1-1000)")(
         NonEmptyList(1, (2 to 1000).toList).reduceMap { n =>
