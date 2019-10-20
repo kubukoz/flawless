@@ -22,7 +22,6 @@ val compilerPlugins = List(
 
 val commonSettings = Seq(
   scalaVersion := "2.12.10",
-  scalacOptions ++= Options.all,
   name := "flawless",
   libraryDependencies ++= List(
     "org.typelevel" %% "cats-tagless-macros" % "0.10",
@@ -39,11 +38,7 @@ val noPublish = Seq(skip in publish := true)
 val core = project.settings(commonSettings).settings(name += "-core")
 
 val tests =
-  project
-    .settings(commonSettings)
-    .settings(name += "-tests")
-    .settings(noPublish)
-    .dependsOn(core)
+  project.settings(commonSettings).settings(name += "-tests").settings(noPublish).dependsOn(core)
 
 val examples =
   project
@@ -59,8 +54,4 @@ val examples =
     .dependsOn(core)
 
 val flawless =
-  project
-    .in(file("."))
-    .settings(commonSettings)
-    .settings(noPublish)
-    .aggregate(core, examples, tests)
+  project.in(file(".")).settings(commonSettings).settings(noPublish).aggregate(core, examples, tests)
