@@ -25,8 +25,6 @@ def compilerPlugins(scalaVersion: String) =
         else Seq(compilerPlugin(("org.scalamacros" % "paradise" % "2.1.1").cross(CrossVersion.full))))
 
 val commonSettings = Seq(
-  scalaVersion := "2.12.10",
-  crossScalaVersions := Seq("2.12.10", "2.13.1"),
   scalacOptions ++= (if (is213(scalaVersion.value)) Seq("-Ymacro-annotations") else Seq()),
   name := "flawless",
   libraryDependencies ++= List(
