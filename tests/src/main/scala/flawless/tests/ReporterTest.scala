@@ -26,7 +26,6 @@ object ReporterTest extends SuiteClass[NoEffect] {
   val runSuite: Suite[NoEffect] = suite("ReporterTest") {
     tests(
       pureTest("suite with two tests") {
-
         val testedSuite = suite("suite 1") {
           tests(
             test[WC]("test 1")(ensureEqual(1, 1).pure[WC]),

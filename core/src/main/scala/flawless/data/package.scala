@@ -19,6 +19,16 @@ import cats.effect.Bracket
 import flawless.data.Suites.RResource
 import flawless.data.Assertion.Failed
 import flawless.data.Assertion.Successful
+import cats.Semigroupal
+import cats.tagless.SemigroupalK
+import cats.tagless.FunctorK
+import cats.FlatMap
+import cats.data.Tuple2K
+import cats.effect.IO
+import cats.tagless.ApplyK
+import cats.effect.ContextShift
+import cats.~>
+import scala.concurrent.ExecutionContext
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -34,6 +44,8 @@ object Assertion {
 }
 
 sealed trait Suites[F[_]] extends Product with Serializable {
+  def mapK[G[_]](f: F ~> G, g: G ~> F): Suites[G] = Suites.MapK(this, f, g)
+
   def interpret(implicit interpreter: Interpreter[F]): F[Suites[Id]] = interpreter.interpret(this)
 
   /**
@@ -73,20 +85,24 @@ object Suites {
 
   final case class Sequence[F[_]](suites: NonEmptyList[Suites[F]], traversal: Traversal[F]) extends Suites[F]
 
+  final case class MapK[F[_], G[_]](underlying: Suites[F], fk: F ~> G, fk2: G ~> F) extends Suites[G]
   final case class One[F[_]](suite: Suite[F]) extends Suites[F]
   final case class RResource[F[_]](resuites: Resource[F, Suites[F]], bracket: Bracket[F, Throwable]) extends Suites[F]
 
-  def flatten(suites: Suites[Id]): NonEmptyList[Suite[Id]] = suites match {
-    case Sequence(suites, _) => suites.flatMap(flatten)
-    case One(suite)          => suite.pure[NonEmptyList]
-    case RResource(_, _)     => throw new AssertionError("Impossible")
-  }
+  // def flatten[F[_]](suites: Suites[F]): NonEmptyList[Suite[Id]] = suites match {
+  //   case Sequence(suites, _) => suites.flatMap(flatten)
+  //   case One(suite)          => suite.pure[NonEmptyList]
+  //   case MapK(underlying, fk) =>
+  //   case RResource(_, _)     => throw new AssertionError("Impossible")
+  // }
+  ???
 }
 
 /**
   * An abstraction on methods of combining two effects - parallel or sequential
   */
 sealed trait Traversal[F[_]] extends Product with Serializable {
+
   final def traverse[S[_]: NonEmptyTraverse, A, B](as: S[A])(f: A => F[B]): F[S[B]] = this match {
     case Traversal.Sequential(a) =>
       implicit val apply = a
@@ -115,6 +131,73 @@ object Traversal {
 final case class Suite[+F[_]](name: String, tests: NonEmptyList[Test[F]]) {
   def via[F2[a] >: F[a]](f: Test[F] => Test[F2]): Suite[F2] = Suite(name, tests.map(f))
   def toSuites[F2[a] >: F[a]]: Suites[F2] = Suites.one(this)
+}
+
+object Suite {
+
+  import cats.~>
+
+  implicit class ParallelKOps[Alg[_[_]], F[_]](alg: Alg[F]) {
+
+    def *>>(another: Alg[F])(implicit S: ParallelK[Alg], flatmapF: FlatMap[F]): Alg[F] =
+      S.seq.map2K(alg, another)(λ[Tuple2K[F, F, ?] ~> F](t => t.first *> t.second))
+
+    def &>>(another: Alg[F])(implicit S: ParallelK[Alg], nepF: NonEmptyParallel[F]): Alg[F] =
+      S.toSeq {
+        S.par
+          .map2K(S.toPar(alg), S.toPar(another))(
+            λ[Tuple2K[F, F, ?] ~> F](t => Parallel.parMap2(t.first, t.second)((_, b) => b))
+          )
+      }
+  }
+
+  implicit val sequentialApplyKSuites: ApplyK[Suites] = new ApplyK[Suites] {
+    def mapK[F[_], G[_]](af: Suites[F])(fk: F ~> G): Suites[G] = af.mapK(fk, ???)
+    def productK[F[_], G[_]](af: Suites[F], ag: Suites[G]): Suites[Tuple2K[F, G, ?]] = ???
+  }
+
+  val parApplyK: ApplyK[Suites] = new ApplyK[Suites] {
+    def mapK[F[_], G[_]](af: Suites[F])(fk: F ~> G): Suites[G] = af.mapK(fk, ???)
+
+    def productK[F[_], G[_]](af: Suites[F], ag: Suites[G]): Suites[Tuple2K[F, G, ?]] = ???
+  }
+
+  trait ~~>[Alg[_[_]], Alg2[_[_]]] {
+    def apply[F[_]](algf: Alg[F]): Alg2[F]
+  }
+
+  object ~~> {
+
+    def id[Alg[_[_]]]: Alg ~~> Alg = new ~~>[Alg, Alg] {
+      def apply[F[_]](algf: Alg[F]): Alg[F] = algf
+    }
+  }
+
+  trait ParallelK[Alg[_[_]]] {
+    type ParAlg[_[_]]
+
+    def seq: ApplyK[Alg]
+    def par: ApplyK[ParAlg]
+
+    def toPar: Alg ~~> ParAlg
+    def toSeq: ParAlg ~~> Alg
+  }
+
+  implicit val alternativeKAlg: ParallelK[Suites] = new ParallelK[Suites] {
+    type ParAlg[F[_]] = Suites[F]
+
+    val seq: ApplyK[Suites] = sequentialApplyKSuites
+    val par: ApplyK[Suites] = parApplyK
+
+    val toPar: Suites ~~> Suites = ~~>.id
+    val toSeq: Suites ~~> Suites = ~~>.id
+  }
+
+  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+
+  val a: Suites[IO] = ???
+
+  val c: Suites[IO] = a *>> a &>> a
 }
 
 final case class Test[+F[_]](name: String, result: TestRun[F]) {

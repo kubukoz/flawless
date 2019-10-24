@@ -17,6 +17,8 @@ import flawless.data.Suite
 import cats.tagless.finalAlg
 import cats.effect.ConsoleOut
 import Interpreter.InterpretOne
+import flawless.data.Suites.MapK
+import cats.~>
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -25,6 +27,8 @@ trait Interpreter[F[_]] {
     * Interprets the test structure to the underlying effect. This is where all the actualy execution happens.
     */
   def interpret: InterpretOne[Suites, F]
+
+  def imapK[G[_]](f: F ~> G, g: G ~> F): Interpreter[G] = ???
 }
 
 object Interpreter {
@@ -33,6 +37,7 @@ object Interpreter {
 
   implicit def defaultInterpreter[F[_]: Monad: Reporter]: Interpreter[F] =
     new Interpreter[F] {
+
       private val interpretTest: InterpretOne[Test, F] = { test =>
         def finish(results: NonEmptyList[Assertion]): Test[Id] = Test(test.name, TestRun.Pure(results))
 
@@ -51,6 +56,7 @@ object Interpreter {
         case Sequence(suites, traversal) => traversal.traverse(suites)(interpret).map(Suites.sequence(_))
         case One(suite)                  => Reporter[F].reportSuite(interpretSuite)(suite).map(One(_))
         case RResource(suites, bracket)  => suites.use(interpret)(bracket)
+        case m: MapK[f, g]               => m.fk(m.underlying.interpret(this.imapK(m.fk2, m.fk)))
       }
     }
 }
