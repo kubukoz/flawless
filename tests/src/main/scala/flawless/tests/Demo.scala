@@ -69,7 +69,7 @@ object Demo extends IOApp {
   }
 
   def run(args: List[String]): IO[ExitCode] = {
-    putStrLn("Flawless 0.0.1 🔪\n\nInitializing...") *>
+    putStrLn("Flawless 0.0.1 👌\n\nInitializing...") *>
       IO.sleep(500.millis) *>
       (1 to max).toList.traverse_(progress) *>
       putStrLn("All tests finished")
