@@ -21,19 +21,15 @@ import scala.util.Random
 object Demo extends IOApp {
   val max = 100
 
-  val files = {
-    val l = List(
+  val files =
+    List(
       "ApplicativeTests",
       "MonadTests",
       "BusinessLogicSuite",
       "GeneratorTests",
-      "BullshitTests",
       "MagicTests",
       "AbstractSingletonProxyFactoryBeanTests"
     )
-
-    List.fill((100 / l.size) + 1)(l).flatten
-  }
 
   def putClear(lines: Int)(txt: String): IO[Unit] = putStrLn(
     s"\u001b[${lines}A" + txt.linesIterator.map("\u001b[0K" + _).mkString("\n")
@@ -48,30 +44,53 @@ object Demo extends IOApp {
   )
 
   def progress(n: Int): IO[Unit] = {
-    val testName = files(n)
+    val testName = files(n % files.size)
     val done = "◼"
     val failed = "◼"
     val notdone = "▫"
 
     val dur = IO(Random.nextInt(20 - (n min 19))).map(_ * 0.8).map(3 + _).map(_.millis)
 
+    val currentString = (n < 100).guard[Option].as(Console.BLUE + done).combineAll
+
+    val remainingString = Console.RESET + (notdone * (max - n - (if (currentString.nonEmpty) 1 else 0)))
+
+    val completedResults = results.flatMap { case (count, b) => List.fill(count)(b) }.take(n)
+
     val squares =
-      results.flatMap { case (count, b) => List.fill(count)(b) }.take(n).foldMap {
+      completedResults.foldMap {
         case true  => Console.GREEN + done
         case false => Console.RED + failed
-      } + Console.RESET + (notdone * (max - n))
+      } + currentString + remainingString
 
-    putClear(3) {
-      s"""Progress:
-         |$squares
-         |$n% ($testName)""".stripMargin
+    val failureString =
+      if (completedResults.contains(false)) s"${Console.RED}[${completedResults.count(!_)} failed]${Console.RESET} "
+      else ""
+
+    putClear(2) {
+      s"""$squares
+         |$n/100 suites ($n%) $failureString($testName)""".stripMargin
     } <* dur.flatMap(IO.sleep)
+  }
+
+  val showFailures = {
+
+    val failedNames =
+      (
+        results.flatMap { case (count, b) => List.fill(count)(b) },
+        Stream.continually(files).flatten.take(100).toList
+      ).parTupled.collect {
+        case (false, s) => s
+      }
+
+    putError("Failed suites: " + failedNames.mkString("\n"))
   }
 
   def run(args: List[String]): IO[ExitCode] = {
     putStrLn("Flawless 0.0.1 👌\n\nInitializing...") *>
       IO.sleep(500.millis) *>
       (1 to max).toList.traverse_(progress) *>
+      showFailures *>
       putStrLn("All tests finished")
   } as ExitCode.Success
 }
