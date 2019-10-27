@@ -61,16 +61,15 @@ object Demo extends IOApp {
         case false => Console.RED + failed
       } + Console.RESET + (notdone * (max - n))
 
-    putClear(4) {
+    putClear(3) {
       s"""Progress:
          |$squares
-         |$n%
-         |$testName""".stripMargin
+         |$n% ($testName)""".stripMargin
     } <* dur.flatMap(IO.sleep)
   }
 
   def run(args: List[String]): IO[ExitCode] = {
-    putStrLn("Hello\nworld\nInitializing...\n") *>
+    putStrLn("Flawless 0.0.1 🔪\n\nInitializing...") *>
       IO.sleep(500.millis) *>
       (1 to max).toList.traverse_(progress) *>
       putStrLn("All tests finished")

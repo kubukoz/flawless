@@ -1,4 +1,4 @@
-# flawless
+# flawless 🔪
 
 Delightful, purely functional testing no-framework.
 
