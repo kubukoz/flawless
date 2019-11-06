@@ -23,7 +23,7 @@ import flawless._
 
 ## Design
 
-See [design doc](DESIGN.md)
+See [design doc](DESIGN.md) and [watch the talk](https://vimeo.com/368027707)!
 
 ## Adoption
 
