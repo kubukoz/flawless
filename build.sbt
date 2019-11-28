@@ -29,7 +29,7 @@ val commonSettings = Seq(
     "org.typelevel" %% "cats-effect" % "2.0.0",
     "dev.profunktor" %% "console4cats" % "0.8.0",
     "com.lihaoyi" %% "sourcecode" % "0.1.8",
-    "com.softwaremill.diffx" %% "diffx-core" % "0.3.10"
+    "com.softwaremill.diffx" %% "diffx-core" % "0.3.11"
   ) ++ compilerPlugins
 )
 
