@@ -24,7 +24,7 @@ val commonSettings = Seq(
   scalaVersion := "2.12.10",
   name := "flawless",
   libraryDependencies ++= List(
-    "org.typelevel" %% "cats-tagless-macros" % "0.10",
+    "org.typelevel" %% "cats-tagless-macros" % "0.11",
     "com.github.julien-truffaut" %% "monocle-macro" % "2.0.1",
     "org.typelevel" %% "cats-effect" % "2.0.0",
     "dev.profunktor" %% "console4cats" % "0.8.1",
