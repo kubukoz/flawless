@@ -1,10 +1,10 @@
-package flawless.tests
+package flawless
 
 import cats.effect.ExitCode
 import cats.effect.IO
-import cats.effect.Console.io._
 import cats.effect.IOApp
 import cats.implicits._
+import cats.effect.Console.io._
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -31,9 +31,8 @@ object Demo extends IOApp {
       "AbstractSingletonProxyFactoryBeanTests"
     )
 
-  def putClear(lines: Int)(txt: String): IO[Unit] = putStrLn(
-    s"\u001b[${lines}A" + txt.linesIterator.map("\u001b[0K" + _).mkString("\n")
-  )
+  def putClear(txt: String): IO[Unit] =
+    putStrLn(s"\033[2J\033[H$header\n" + txt.linesIterator.mkString("\n"))
 
   val results = List(
     30 -> true,
@@ -67,10 +66,15 @@ object Demo extends IOApp {
       if (completedResults.contains(false)) s"${Console.RED}[${completedResults.count(!_)} failed]${Console.RESET} "
       else ""
 
-    putClear(2) {
-      s"""$squares
-         |$n/100 suites ($n%) $failureString($testName)""".stripMargin
-    } <* dur.flatMap(IO.sleep)
+    val noise = IO(Random.nextBoolean()).flatMap {
+      case true => IO(println("some random noise\nmore random noise\neven more random noise"))
+      case _    => IO.unit
+    }
+
+    noise *>
+      putClear(s"""$squares
+                  |$n/100 suites ($n%) $failureString($testName)""".stripMargin) <*
+      dur.flatMap(IO.sleep)
   }
 
   val showFailures = {
@@ -86,8 +90,10 @@ object Demo extends IOApp {
     putError("Failed suites: " + failedNames.mkString("\n"))
   }
 
+  val header = "Flawless 0.0.1 👌"
+
   def run(args: List[String]): IO[ExitCode] = {
-    putStrLn("Flawless 0.0.1 👌\n\nInitializing...") *>
+    putStrLn(s"$header\n\nInitializing...") *>
       IO.sleep(500.millis) *>
       (1 to max).toList.traverse_(progress) *>
       showFailures *>
