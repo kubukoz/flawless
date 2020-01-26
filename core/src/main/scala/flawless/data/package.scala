@@ -115,13 +115,16 @@ object Suite {
     parSequence(NonEmptyList(first, rest.toList))
 
   def parSequence[F[_]: NonEmptyParallel](suitesSequence: NonEmptyList[Suite[F]]): Suite[F] =
-    algebra.Sequence[F](suitesSequence, Traversal.parallel)
+    combineWith(suitesSequence)(Traversal.parallel)
 
   def sequential[F[_]: Apply](first: Suite[F], rest: Suite[F]*): Suite[F] =
     sequence(NonEmptyList(first, rest.toList))
 
   def sequence[F[_]: Apply](suitesSequence: NonEmptyList[Suite[F]]): Suite[F] =
-    algebra.Sequence[F](suitesSequence, Traversal.sequential)
+    combineWith(suitesSequence)(Traversal.sequential)
+
+  def combineWith[F[_]](suites: NonEmptyList[Suite[F]])(traversal: Traversal[F]): Suite[F] =
+    algebra.Sequence(suites, traversal)
 
   def resource[F[_]: Bracket[*[_], Throwable]](suitesInResource: Resource[F, Suite[F]]): Suite[F] =
     algebra.RResource(suitesInResource, Bracket[F, Throwable])
