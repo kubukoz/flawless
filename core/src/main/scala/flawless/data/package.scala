@@ -87,6 +87,7 @@ object Suites {
   * An abstraction on methods of combining two effects - parallel or sequential
   */
 sealed trait Traversal[F[_]] extends Product with Serializable {
+
   final def traverse[S[_]: NonEmptyTraverse, A, B](as: S[A])(f: A => F[B]): F[S[B]] = this match {
     case Traversal.Sequential(a) =>
       implicit val apply = a

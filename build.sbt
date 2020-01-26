@@ -23,6 +23,7 @@ val compilerPlugins = List(
 val commonSettings = Seq(
   scalaVersion := "2.12.10",
   name := "flawless",
+  scalacOptions -= "-Xfatal-warnings",
   libraryDependencies ++= List(
     "org.typelevel" %% "cats-tagless-macros" % "0.11",
     "com.github.julien-truffaut" %% "monocle-macro" % "2.0.1",
