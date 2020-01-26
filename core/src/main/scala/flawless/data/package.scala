@@ -209,14 +209,14 @@ object TestRun {
   final case class Lazy(result: cats.Eval[Assertion]) extends TestRun[Nothing]
 }
 
-trait Assertions[F[_]] {
+trait Assert[F[_]] {
   def add(assertion: Assertion): F[Unit]
 }
 
-object Assertions {
+object Assert {
 
-  def refInstance[F[_]: Applicative](ref: Ref[F, Assertion]): Assertions[F] =
-    new Assertions[F] {
+  def refInstance[F[_]: Applicative](ref: Ref[F, Assertion]): Assert[F] =
+    new Assert[F] {
       def add(assertion: Assertion): F[Unit] = ref.update(_ |+| assertion)
     }
 }

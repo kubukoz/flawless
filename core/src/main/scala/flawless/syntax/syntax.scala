@@ -32,12 +32,12 @@ object dsl {
     * Provides access to assertions in a monadic fashion.
     * If no assertions are added, the test completes with a single successful assertion.
     */
-  def testMonadic[F[_]: Sync](name: String)(assertions: Assertions[F] => F[Unit]): NonEmptyList[Test[F]] =
+  def testMonadic[F[_]: Sync](name: String)(assertions: Assert[F] => F[Unit]): NonEmptyList[Test[F]] =
     test[F](name) {
       Ref[F]
         .of(Assertion.successful)
         .flatTap { ref =>
-          assertions(Assertions.refInstance(ref))
+          assertions(Assert.refInstance(ref))
         }
         .flatMap(_.get)
     }
