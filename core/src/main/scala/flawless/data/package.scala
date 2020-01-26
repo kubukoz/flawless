@@ -99,6 +99,12 @@ object Traversal {
 
 final case class Suite[+F[_]](name: String, tests: NonEmptyList[Test[F]]) {
   def toSuites[F2[a] >: F[a]]: Suites[F2] = Suites.one(this)
+
+  //I swear, this variance thing is going to end this library
+  def zip[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
+  def parZip[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
+  def |+|[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
+  def |*|[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
 }
 
 //todo rename result to run
