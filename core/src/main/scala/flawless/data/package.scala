@@ -20,6 +20,8 @@ import cats.Functor
 import cats.FlatMap
 
 import Suite.algebra
+import cats.kernel.Monoid
+import cats.kernel.Semigroup
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -83,10 +85,14 @@ sealed trait Suite[+F[_]] extends Product with Serializable {
     interpreter.interpret(this)
 
   //I swear, this variance thing is going to end this library
-  def zip[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
-  def parZip[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
-  def |+|[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
-  def |*|[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
+  def zip[F2[a] >: F[a]: Apply](another: Suite[F2]): Suite[F2] = this |+| another
+  def parZip[F2[a] >: F[a]: NonEmptyParallel](another: Suite[F2]): Suite[F2] = this |&| another
+  def |+|[F2[a] >: F[a]: Apply](another: Suite[F2]): Suite[F2] = Semigroup[Suite[F2]].combine(this, another)
+  def |&|[F2[a] >: F[a]: NonEmptyParallel](another: Suite[F2]): Suite[F2] = Suite.parallel(this, another)
+
+  // Duplicate this suite n times. For the sequential version, use semigroup syntax.
+  def parCombineN[F2[a] >: F[a]: NonEmptyParallel](n: Int): Suite[F2] =
+    Suite.parSequence[F2](NonEmptyList.one(this).combineN(n))
 }
 
 object Suite {
@@ -108,6 +114,10 @@ object Suite {
     algebra.RResource(suitesInResource, Bracket[F, Throwable])
 
   def suspend[F[_]](suites: F[Suite[F]]): Suite[F] = algebra.Suspend(suites)
+
+  implicit def suiteSemigroup[F[_]: Apply]: Semigroup[Suite[F]] = new Semigroup[Suite[F]] {
+    def combine(x: Suite[F], y: Suite[F]): Suite[F] = Suite.sequential(x, y)
+  }
 
   private[flawless] object algebra {
     final case class One[F[_]](name: String, tests: NonEmptyList[Test[F]]) extends Suite[F]

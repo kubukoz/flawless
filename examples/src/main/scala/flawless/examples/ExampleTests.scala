@@ -13,7 +13,6 @@ import _root_.doobie.util.ExecutionContexts
 import _root_.doobie.hikari.HikariTransactor
 import cats.effect.Blocker
 import flawless.TestApp
-import cats.implicits._
 
 object ExampleTests extends IOApp with TestApp {
 
@@ -42,29 +41,23 @@ object ExampleTests extends IOApp with TestApp {
                    )
     } yield transactor
 
-    Suite.resource[IO] {
-      xa.map { transactor =>
-        Suite.parSequence(NonEmptyList.of(new DoobieQueryTests(transactor).runSuite).combineN(10))
+    Suite
+      .resource[IO] {
+        xa.map { transactor =>
+          new DoobieQueryTests(transactor).runSuite.parCombineN(5) //5 suites per allocation
+        }
       }
-    }
+      .parCombineN(2) //2 allocations
   }
-
-  val runSequentials = Suite.sequential(
-    Suite.parSequence(sequentialTests.map(_.runSuite)),
-    dbTests
-  )
-
-  val runFlaky = FlakySuite.runSuite
-
-  val runExpensives =
-    Suite.parSequence[IO](NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
-
-  val runParallels = Suite.parSequence(parallelTests.map(_.runSuite))
-
-  val testRange = Suite.sequential(runFlaky, runExpensives, runParallels, runSequentials)
 
   override def run(args: List[String]): IO[ExitCode] =
     runTests(args)(
-      testRange
+      Suite.sequential(
+        FlakySuite.runSuite,
+        ExpensiveSuite.runSuite.parCombineN[IO](10),
+        Suite.parSequence(parallelTests.map(_.runSuite)),
+        Suite.parSequence(sequentialTests.map(_.runSuite)),
+        dbTests
+      )
     )
 }
