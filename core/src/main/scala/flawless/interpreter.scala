@@ -70,7 +70,7 @@ object Reporter {
     new Reporter[F] {
       private def putStrWithDepth(depth: Int): String => F[Unit] = s => ConsoleOut[F].putStrLn(" " * depth * 2 + s)
 
-      private val putSuite = ConsoleOut[F].putStrLn(_: String)
+      private val putSuite = putStrWithDepth(0)
       private val putTest = putStrWithDepth(1)
 
       //this is going to need access to a summarizer of tests,
