@@ -45,7 +45,7 @@ package object flawless {
         else inRed(show"Failed: ${test.name}")
 
       val failedAssertions = assertions.toList.collect {
-        case flawless.data.Assertion.AssertionResult.Failed(failure) =>
+        case flawless.data.Assertion.Result.Failed(failure) =>
           inRed(
             // show"${failure.text} (${failure.location})"
             failure //todo

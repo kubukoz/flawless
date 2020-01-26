@@ -43,15 +43,15 @@ object RunStats {
     private val testAssertions: Getter[Test[Id], Assertion] =
       Getter((_: Test[Id]).result).composeGetter(testRunToAssertions)
 
-    private val assertionResults: Getter[Assertion, NonEmptyList[Assertion.AssertionResult]] = Getter(_.results)
+    private val assertionResults: Getter[Assertion, NonEmptyList[Assertion.Result]] = Getter(_.results)
 
     val suiteToTests: Fold[Suite[Id], Test[Id]] =
       suiteTests.composeFold(Fold.fromFoldable)
 
-    val testToAssertionResults: Fold[Test[Id], Assertion.AssertionResult] =
+    val testToAssertionResults: Fold[Test[Id], Assertion.Result] =
       testAssertions.composeGetter(assertionResults).composeFold(Fold.fromFoldable)
 
-    val suiteToAssertions: Fold[Suite[Id], Assertion.AssertionResult] =
+    val suiteToAssertions: Fold[Suite[Id], Assertion.Result] =
       optics.suiteToTests composeFold optics.testToAssertionResults
   }
 
@@ -78,10 +78,7 @@ object RunStats {
       * Get the stats for the selected metric (as defined by the `select` traversal) of all the suites in `fa`.
       * `traversal` defines how to go from the selected metric to the assertions.
       * */
-    def of[Selected](
-      select: Fold[Suite[Id], Selected],
-      traversal: Fold[Selected, Assertion.AssertionResult]
-    ): RunStats.Stat = {
+    def of[Selected](select: Fold[Suite[Id], Selected], traversal: Fold[Selected, Assertion.Result]): RunStats.Stat = {
       val (succeeded, failed) =
         partitionAll(suites, select, traversal.all(_.isSuccessful))
 

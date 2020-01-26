@@ -18,38 +18,38 @@ import cats.FlatMap
 import flawless.dsl.NoEffect
 import cats.kernel.Semigroup
 import cats.kernel.Monoid
-import flawless.data.Assertion.AssertionResult
+import flawless.data.Assertion.Result
 import flawless.data.Assertion.One
 import flawless.data.Assertion.All
 
 sealed trait Assertion extends Product with Serializable {
 
-  def results: NonEmptyList[AssertionResult] = this match {
+  def results: NonEmptyList[Result] = this match {
     case One(result)     => NonEmptyList.one(result)
     case All(assertions) => assertions.flatMap(_.results)
   }
 }
 
 object Assertion {
-  val successful: Assertion = one(AssertionResult.Successful)
-  def failed(message: String): Assertion = one(AssertionResult.Failed(message))
+  val successful: Assertion = one(Result.Successful)
+  def failed(message: String): Assertion = one(Result.Failed(message))
 
-  def one(result: AssertionResult): Assertion = One(result)
+  def one(result: Result): Assertion = One(result)
 
-  sealed trait AssertionResult extends Product with Serializable {
+  sealed trait Result extends Product with Serializable {
 
     def isSuccessful: Boolean = this match {
-      case AssertionResult.Failed(_)  => false
-      case AssertionResult.Successful => true
+      case Result.Failed(_)  => false
+      case Result.Successful => true
     }
   }
 
-  object AssertionResult {
-    case object Successful extends AssertionResult
-    final case class Failed(message: String) extends AssertionResult
+  object Result {
+    case object Successful extends Result
+    final case class Failed(message: String) extends Result
   }
 
-  final case class One(result: AssertionResult) extends Assertion
+  final case class One(result: Result) extends Assertion
   final case class All(assertions: NonEmptyList[Assertion]) extends Assertion
 
   implicit val assertionMonoid: Monoid[Assertion] = new Monoid[Assertion] {
