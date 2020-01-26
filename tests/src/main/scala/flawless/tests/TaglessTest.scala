@@ -37,13 +37,13 @@ final class TaglessTest[F[_]: MyAlg: Sync] extends SuiteClass[F] {
           ensureEqual(before, 1) |+| ensureEqual(after, 2)
         }
       ),
-      testMonadic[F]("monadic tagless") { implicit assertions =>
+      testMonadic[F]("monadic tagless") { implicit assertM =>
         for {
           _      <- MyAlg[F].reset
           before <- MyAlg[F].hello
-          _      <- assertions.add(ensureEqual(before, 1))
+          _      <- assertM(ensureEqual(before, 1))
           after  <- MyAlg[F].hello
-          _      <- assertions.add(ensureEqual(after, 2))
+          _      <- assertM(ensureEqual(after, 2))
         } yield ()
       }
     )

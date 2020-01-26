@@ -52,6 +52,7 @@ object dsl {
 
   def ensureEqual[A: Diff: Show](actual: A, expected: A): Assertion =
     ensure(actual, predicates.all.equalTo(expected))
+
   def assertion(cond: Boolean, ifFalse: String): Assertion = ensure(cond, predicates.all.isTrue(ifFalse))
 }
 

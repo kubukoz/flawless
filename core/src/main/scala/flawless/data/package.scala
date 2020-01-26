@@ -210,13 +210,13 @@ object TestRun {
 }
 
 trait Assert[F[_]] {
-  def add(assertion: Assertion): F[Unit]
+  def apply(assertion: Assertion): F[Unit]
 }
 
 object Assert {
 
   def refInstance[F[_]: Applicative](ref: Ref[F, Assertion]): Assert[F] =
     new Assert[F] {
-      def add(assertion: Assertion): F[Unit] = ref.update(_ |+| assertion)
+      def apply(assertion: Assertion): F[Unit] = ref.update(_ |+| assertion)
     }
 }
