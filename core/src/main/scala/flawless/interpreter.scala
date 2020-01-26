@@ -1,8 +1,6 @@
 package flawless
 
-import cats.data.NonEmptyList
 import cats.implicits._
-import cats.Id
 import cats.Monad
 import cats.FlatMap
 import flawless.data.Test
