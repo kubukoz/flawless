@@ -21,18 +21,18 @@ object ReporterTest extends SuiteClass[NoEffect] {
 
   implicit val reporter: Reporter[WC] = Reporter.consoleInstance[WC]
 
-  val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
+  implicit val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
 
   val runSuite: Suite[NoEffect] = suite("ReporterTest") {
     tests(
       pureTest("suite with two tests") {
 
-        val testedSuite = suite("suite 1") {
+        val testedSuite = suite[WC]("suite 1") {
           tests(
-            test[WC]("test 1")(ensureEqual(1, 1).pure[WC]),
-            test[WC]("test 2")(ensureEqual(1, 1).pure[WC])
+            pureTest("test 1")(ensureEqual(1, 1)),
+            pureTest("test 2")(ensureEqual(1, 1))
           )
-        }.toSuites
+        }
 
         val test1Result = "Pure(NonEmptyList(Successful))"
         val test2Result = "Pure(NonEmptyList(Successful))"
@@ -46,7 +46,7 @@ object ReporterTest extends SuiteClass[NoEffect] {
                 |  Finished test: test 2, result: $test2Result
                 |Finished suite: suite 1, result: $suiteResult""".stripMargin.linesIterator.toList.map(_ + "\n")
 
-        ensureEqual(interpreter.interpret(testedSuite).written.toList, expectedOut)
+        ensureEqual(testedSuite.interpret.written.toList, expectedOut)
       }
     )
   }

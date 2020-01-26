@@ -49,3 +49,12 @@ final class TaglessTest[F[_]: MyAlg: Sync] extends SuiteClass[F] {
     )
   }
 }
+
+final class TaglessTestLocalResource[F[_]: Sync] extends SuiteClass[F] {
+
+  val runSuite: Suite[F] = Suite.suspend {
+    MyAlg.syncInstance[F].map { implicit alg =>
+      new TaglessTest[F].runSuite.renameEach(_ => "tagless with local instance".pure[F])
+    }
+  }
+}

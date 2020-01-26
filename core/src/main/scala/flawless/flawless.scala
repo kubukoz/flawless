@@ -4,26 +4,28 @@ import flawless.stats.RunStats
 import cats.Id
 
 package object flawless {
+
+  import cats.data.NonEmptyList
   import cats.FlatMap
   import flawless.data.Test
   import cats.Monad
   import cats.Applicative
   import cats.effect.ConsoleOut
-  import flawless.data.Suites
+  import flawless.data.Suite
 
   def loadArgs[F[_]: Applicative](args: List[String]): F[Unit] = {
     val _ = args
     Applicative[F].unit
   }
 
-  def runTests[F[_]: Interpreter: ConsoleOut: Monad](args: List[String])(suites: Suites[F]): F[ExitCode] =
+  def runTests[F[_]: Interpreter: ConsoleOut: Monad](args: List[String])(suites: Suite[F]): F[ExitCode] =
     loadArgs[F](args) *> suites.interpret.flatMap(summarize[F])
 
-  def summarize[F[_]: ConsoleOut: FlatMap](suites: Suites[Id]): F[ExitCode] = {
+  def summarize[F[_]: ConsoleOut: FlatMap](suites: Suite[Id]): F[ExitCode] = {
     import scala.io.AnsiColor
-    val suitesFlat = Suites.flatten(suites)
+    val suitesFlat = Suite.flatten(suites)
 
-    val stats = RunStats.fromSuites(suitesFlat)
+    val stats = RunStats.fromSuites[NonEmptyList](suitesFlat)
 
     val weGood = stats.suite.failed === 0
     val exit = if (weGood) ExitCode.Success else ExitCode.Error

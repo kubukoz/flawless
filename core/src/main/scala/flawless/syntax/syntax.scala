@@ -21,7 +21,7 @@ object dsl {
   // This idea is heavily inspired by ZIO Test.
   type Predicate[-A] = A => Assertion
 
-  def suite[F[_]](name: String)(tests: NonEmptyList[Test[F]]): Suite[F] = new Suite(name, tests)
+  def suite[F[_]](name: String)(tests: NonEmptyList[Test[F]]): Suite[F] = Suite.one(name, tests)
 
   def tests[F[_]](firstTest: NonEmptyList[Test[F]], rest: NonEmptyList[Test[F]]*): NonEmptyList[Test[F]] =
     NonEmptyList(firstTest, rest.toList).reduce
@@ -50,7 +50,9 @@ object dsl {
     NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions))))
 
   def ensure[A](value: A, predicate: Predicate[A]): NonEmptyList[Assertion] = NonEmptyList.one(predicate(value))
-  def ensureEqual[A: Diff: Show](actual: A, expected: A): NonEmptyList[Assertion] = ensure(actual, predicates.all.equalTo(expected))
+
+  def ensureEqual[A: Diff: Show](actual: A, expected: A): NonEmptyList[Assertion] =
+    ensure(actual, predicates.all.equalTo(expected))
   def assertion(cond: Boolean, ifFalse: String): NonEmptyList[Assertion] = ensure(cond, predicates.all.isTrue(ifFalse))
 }
 
