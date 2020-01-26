@@ -11,13 +11,17 @@ import flawless.data.Suites
 object FlawlessTests extends IOApp with TestApp {
 
   def run(args: List[String]): IO[ExitCode] =
-    MyAlg.syncInstance[IO].flatMap { implicit alg =>
-      runTests[IO](args) {
-        Suites.sequential(
-          GetStatsTest.runSuite.toSuites,
-          ReporterTest.runSuite.toSuites,
+    runTests[IO](args) {
+      val tagless = Suites.suspend {
+        MyAlg.syncInstance[IO].map { implicit alg =>
           new TaglessTest[IO].runSuite.toSuites
-        )
+        }
       }
+
+      Suites.sequential(
+        GetStatsTest.runSuite.toSuites,
+        ReporterTest.runSuite.toSuites,
+        tagless
+      )
     }
 }

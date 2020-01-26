@@ -10,15 +10,17 @@ import cats.Apply
 import cats.Parallel
 import flawless.data.Suites.Sequence
 import flawless.data.Suites.One
+import flawless.data.Suites.RResource
+import flawless.data.Suites.Suspend
 import cats.NonEmptyTraverse
 import cats.effect.concurrent.Ref
 import cats.data.Chain
 import cats.Foldable
 import cats.effect.Resource
 import cats.effect.Bracket
-import flawless.data.Suites.RResource
 import flawless.data.Assertion.Failed
 import flawless.data.Assertion.Successful
+import cats.Functor
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -39,9 +41,10 @@ sealed trait Suites[F[_]] extends Product with Serializable {
   /**
     * Modifies every suite in this structure with the given function.
     */
-  def via(f: Suite[F] => Suite[F]): Suites[F] = this match {
+  def via(f: Suite[F] => Suite[F])(implicit F: Functor[F]): Suites[F] = this match {
     case Sequence(suites, traversal) => Sequence(suites.map(_.via(f)), traversal)
     case One(suite)                  => One(f(suite))
+    case Suspend(suites)             => Suspend(suites.map(_.via(f)))
     case RResource(resuites, a) =>
       implicit val applicative = a
       RResource(resuites.map(_.via(f)), a)
@@ -50,7 +53,7 @@ sealed trait Suites[F[_]] extends Product with Serializable {
   /**
     * Modifies every test in this structure with the given function.
     */
-  def viaTest(f: Test[F] => Test[F]): Suites[F] = via(_.via(f))
+  def viaTest(f: Test[F] => Test[F])(implicit F: Functor[F]): Suites[F] = via(_.via(f))
 }
 
 object Suites {
@@ -71,14 +74,17 @@ object Suites {
   def resource[F[_]: Bracket[*[_], Throwable]](suitesInResource: Resource[F, Suites[F]]): Suites[F] =
     RResource(suitesInResource, Bracket[F, Throwable])
 
-  final case class Sequence[F[_]](suites: NonEmptyList[Suites[F]], traversal: Traversal[F]) extends Suites[F]
+  def suspend[F[_]](suites: F[Suites[F]]): Suites[F] = Suspend(suites)
 
+  final case class Sequence[F[_]](suites: NonEmptyList[Suites[F]], traversal: Traversal[F]) extends Suites[F]
   final case class One[F[_]](suite: Suite[F]) extends Suites[F]
+  final case class Suspend[F[_]](suites: F[Suites[F]]) extends Suites[F]
   final case class RResource[F[_]](resuites: Resource[F, Suites[F]], bracket: Bracket[F, Throwable]) extends Suites[F]
 
   def flatten(suites: Suites[Id]): NonEmptyList[Suite[Id]] = suites match {
     case Sequence(suites, _) => suites.flatMap(flatten)
     case One(suite)          => suite.pure[NonEmptyList]
+    case Suspend(suites)     => flatten(suites)
     case RResource(_, _)     => throw new AssertionError("Impossible")
   }
 }
