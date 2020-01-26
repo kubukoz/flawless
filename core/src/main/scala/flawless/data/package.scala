@@ -62,37 +62,50 @@ object Traversal {
   def parallel[F[_]: NonEmptyParallel]: Traversal[F] = Parallel(NonEmptyParallel[F])
 }
 
+/**
+  * A value of this type is a non-empty sequence of test suites. Each suite must have a name.
+  * Suites can be composed to run sequentially or in parallel to each other. Effects and resources can also be lifted to a Suite.
+  */
 sealed trait Suite[+F[_]] extends Product with Serializable {
 
-  //This will probably be an aspect later
-  def renameEach[F2[a] >: F[a]: FlatMap](modName: String => F2[String]): Suite[F2] = {
+  /**
+    * Rename each suite in this value using the given function.
+    * todo: this should be an aspect
+    *  */
+  def renameEach[F2[a] >: F[a]: FlatMap](modName: String => F2[String]): Suite[F2] =
+    Suite.renameEach(modName).apply(this)
 
-    //todo what about stack safety in the case of effectless tests?
-    def go(self: Suite[F2]): F2[Suite[F2]] = self match {
-      case o: algebra.One[f] =>
-        //typing newName manually is needed due to GADT limitation
-        Functor[f].map(modName(o.name))(algebra.One[f](_: String, o.tests))
-
-      case s: algebra.Sequence[f]  => s.traversal.traverse(s.suites)(go)
-      case r: algebra.RResource[f] => r.resuite.evalMap(go)(r.bracket)
-      case s: algebra.Suspend[f]   => s.suite.flatMap(go)
-    }
-
-    Suite.suspend(go(this))
-  }
-
-  private[flawless] def interpret[F2[a] >: F[a]](implicit interpreter: Interpreter[F2]): F2[Suite[NoEffect]] =
-    interpreter.interpret(this)
-
-  //I swear, this variance thing is going to end this library
+  /**
+    * Combine the two sets of suites sequentially.
+    */
   def zip[F2[a] >: F[a]: Apply](another: Suite[F2]): Suite[F2] = this |+| another
+
+  /**
+    * Combine the two sets of suites in parallel.
+    * */
   def parZip[F2[a] >: F[a]: NonEmptyParallel](another: Suite[F2]): Suite[F2] = this |&| another
+
+  /**
+    * Alias for [[zip]].
+    */
   def |+|[F2[a] >: F[a]: Apply](another: Suite[F2]): Suite[F2] = Semigroup[Suite[F2]].combine(this, another)
+
+  /**
+    * Alias for [[parZip]].
+    */
   def |&|[F2[a] >: F[a]: NonEmptyParallel](another: Suite[F2]): Suite[F2] = Suite.parallel(this, another)
 
   // Duplicate this suite n times. For the sequential version, use semigroup syntax.
   def parCombineN[F2[a] >: F[a]: NonEmptyParallel](n: Int): Suite[F2] =
     Suite.parSequence[F2](NonEmptyList.one(this).combineN(n))
+
+  /**
+    * Widen the effect type of this suite.
+    */
+  def widenF[F2[a] >: F[a]]: Suite[F2] = this
+
+  private[flawless] def interpret[F2[a] >: F[a]](implicit interpreter: Interpreter[F2]): F2[Suite[NoEffect]] =
+    interpreter.interpret(this)
 }
 
 object Suite {
@@ -117,6 +130,21 @@ object Suite {
 
   implicit def suiteSemigroup[F[_]: Apply]: Semigroup[Suite[F]] = new Semigroup[Suite[F]] {
     def combine(x: Suite[F], y: Suite[F]): Suite[F] = Suite.sequential(x, y)
+  }
+
+  def renameEach[F[_]: FlatMap](modName: String => F[String]): Suite[F] => Suite[F] = {
+    //todo what about stack safety in the case of tests in Id?
+    def go(self: Suite[F]): F[Suite[F]] = self match {
+      case o: algebra.One[f] =>
+        //typing newName manually is needed due to GADT limitation
+        Functor[f].map(modName(o.name))(algebra.One[f](_: String, o.tests))
+
+      case s: algebra.Sequence[f]  => s.traversal.traverse(s.suites)(go)
+      case r: algebra.RResource[f] => r.resuite.evalMap(go)(r.bracket)
+      case s: algebra.Suspend[f]   => s.suite.flatMap(go)
+    }
+
+    (go _).andThen(Suite.suspend)
   }
 
   private[flawless] object algebra {
