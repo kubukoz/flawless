@@ -30,43 +30,6 @@ object Assertion {
   final case class Failed(message: String) extends Assertion
 }
 
-sealed trait Suites[F[_]] extends Product with Serializable {
-  def interpret(implicit interpreter: Interpreter[F]): F[Suites[Id]] = interpreter.interpret(this)
-}
-
-object Suites {
-  def one[F[_]](suite: Suite[F]): Suites[F] = One(suite)
-
-  def parallel[F[_]: NonEmptyParallel](first: Suites[F], rest: Suites[F]*): Suites[F] =
-    parSequence(NonEmptyList(first, rest.toList))
-
-  def parSequence[F[_]: NonEmptyParallel](suitesSequence: NonEmptyList[Suites[F]]): Suites[F] =
-    Sequence[F](suitesSequence, Traversal.parallel)
-
-  def sequential[F[_]: Apply](first: Suites[F], rest: Suites[F]*): Suites[F] =
-    sequence(NonEmptyList(first, rest.toList))
-
-  def sequence[F[_]: Apply](suitesSequence: NonEmptyList[Suites[F]]): Suites[F] =
-    Sequence[F](suitesSequence, Traversal.sequential)
-
-  def resource[F[_]: Bracket[*[_], Throwable]](suitesInResource: Resource[F, Suites[F]]): Suites[F] =
-    RResource(suitesInResource, Bracket[F, Throwable])
-
-  def suspend[F[_]](suites: F[Suites[F]]): Suites[F] = Suspend(suites)
-
-  final case class Sequence[F[_]](suites: NonEmptyList[Suites[F]], traversal: Traversal[F]) extends Suites[F]
-  final case class One[F[_]](suite: Suite[F]) extends Suites[F]
-  final case class Suspend[F[_]](suites: F[Suites[F]]) extends Suites[F]
-  final case class RResource[F[_]](resuites: Resource[F, Suites[F]], bracket: Bracket[F, Throwable]) extends Suites[F]
-
-  def flatten(suites: Suites[Id]): NonEmptyList[Suite[Id]] = suites match {
-    case Sequence(suites, _) => suites.flatMap(flatten)
-    case One(suite)          => suite.pure[NonEmptyList]
-    case Suspend(suites)     => flatten(suites)
-    case RResource(_, _)     => throw new AssertionError("Impossible")
-  }
-}
-
 /**
   * An abstraction on methods of combining two effects - parallel or sequential
   */
@@ -97,14 +60,47 @@ object Traversal {
   def parallel[F[_]: NonEmptyParallel]: Traversal[F] = Parallel(NonEmptyParallel[F])
 }
 
-final case class Suite[+F[_]](name: String, tests: NonEmptyList[Test[F]]) {
-  def toSuites[F2[a] >: F[a]]: Suites[F2] = Suites.one(this)
+sealed trait Suite[+F[_]] extends Product with Serializable {
+  def interpret[F2[a] >: F[a]](implicit interpreter: Interpreter[F2]): F2[Suite[Id]] = interpreter.interpret(this)
 
   //I swear, this variance thing is going to end this library
   def zip[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
   def parZip[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
   def |+|[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
   def |*|[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
+}
+
+object Suite {
+  def one[F[_]](name: String, tests: NonEmptyList[Test[F]]): Suite[F] = One(name, tests)
+
+  def parallel[F[_]: NonEmptyParallel](first: Suite[F], rest: Suite[F]*): Suite[F] =
+    parSequence(NonEmptyList(first, rest.toList))
+
+  def parSequence[F[_]: NonEmptyParallel](suitesSequence: NonEmptyList[Suite[F]]): Suite[F] =
+    Sequence[F](suitesSequence, Traversal.parallel)
+
+  def sequential[F[_]: Apply](first: Suite[F], rest: Suite[F]*): Suite[F] =
+    sequence(NonEmptyList(first, rest.toList))
+
+  def sequence[F[_]: Apply](suitesSequence: NonEmptyList[Suite[F]]): Suite[F] =
+    Sequence[F](suitesSequence, Traversal.sequential)
+
+  def resource[F[_]: Bracket[*[_], Throwable]](suitesInResource: Resource[F, Suite[F]]): Suite[F] =
+    RResource(suitesInResource, Bracket[F, Throwable])
+
+  def suspend[F[_]](suites: F[Suite[F]]): Suite[F] = Suspend(suites)
+
+  final case class One[F[_]](name: String, tests: NonEmptyList[Test[F]]) extends Suite[F]
+  final case class Sequence[F[_]](suites: NonEmptyList[Suite[F]], traversal: Traversal[F]) extends Suite[F]
+  final case class Suspend[F[_]](suite: F[Suite[F]]) extends Suite[F]
+  final case class RResource[F[_]](resuite: Resource[F, Suite[F]], bracket: Bracket[F, Throwable]) extends Suite[F]
+
+  private[flawless] val flatten: Suite[Id] => NonEmptyList[Suite.One[Id]] = {
+    case Sequence(suites, _) => suites.flatMap(flatten)
+    case o @ One(_, _)       => o.pure[NonEmptyList]
+    case Suspend(suites)     => flatten(suites)
+    case RResource(_, _)     => throw new AssertionError("Impossible")
+  }
 }
 
 //todo rename result to run

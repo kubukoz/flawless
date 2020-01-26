@@ -32,7 +32,7 @@ object ReporterTest extends SuiteClass[NoEffect] {
             pureTest("test 1")(ensureEqual(1, 1)),
             pureTest("test 2")(ensureEqual(1, 1))
           )
-        }.toSuites
+        }
 
         val test1Result = "Pure(NonEmptyList(Successful))"
         val test2Result = "Pure(NonEmptyList(Successful))"
