@@ -8,7 +8,6 @@ import cats.effect.Sync
 import cats.effect.concurrent.Ref
 import cats.implicits._
 import cats.data.State
-import cats.FlatMap
 
 @finalAlg
 trait MyAlg[F[_]] {
