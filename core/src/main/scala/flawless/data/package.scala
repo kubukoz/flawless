@@ -8,10 +8,6 @@ import cats.Id
 import cats.NonEmptyParallel
 import cats.Apply
 import cats.Parallel
-import flawless.data.Suites.Sequence
-import flawless.data.Suites.One
-import flawless.data.Suites.RResource
-import flawless.data.Suites.Suspend
 import cats.NonEmptyTraverse
 import cats.effect.concurrent.Ref
 import cats.data.Chain
@@ -20,7 +16,6 @@ import cats.effect.Resource
 import cats.effect.Bracket
 import flawless.data.Assertion.Failed
 import flawless.data.Assertion.Successful
-import cats.Functor
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -37,23 +32,6 @@ object Assertion {
 
 sealed trait Suites[F[_]] extends Product with Serializable {
   def interpret(implicit interpreter: Interpreter[F]): F[Suites[Id]] = interpreter.interpret(this)
-
-  /**
-    * Modifies every suite in this structure with the given function.
-    */
-  def via(f: Suite[F] => Suite[F])(implicit F: Functor[F]): Suites[F] = this match {
-    case Sequence(suites, traversal) => Sequence(suites.map(_.via(f)), traversal)
-    case One(suite)                  => One(f(suite))
-    case Suspend(suites)             => Suspend(suites.map(_.via(f)))
-    case RResource(resuites, a) =>
-      implicit val applicative = a
-      RResource(resuites.map(_.via(f)), a)
-  }
-
-  /**
-    * Modifies every test in this structure with the given function.
-    */
-  def viaTest(f: Test[F] => Test[F])(implicit F: Functor[F]): Suites[F] = via(_.via(f))
 }
 
 object Suites {
@@ -120,23 +98,13 @@ object Traversal {
 }
 
 final case class Suite[+F[_]](name: String, tests: NonEmptyList[Test[F]]) {
-  def via[F2[a] >: F[a]](f: Test[F] => Test[F2]): Suite[F2] = Suite(name, tests.map(f))
   def toSuites[F2[a] >: F[a]]: Suites[F2] = Suites.one(this)
 }
 
-final case class Test[+F[_]](name: String, result: TestRun[F]) {
-  //Maybe use via in interpreter?
-  //todo add ability for `via` to run effects (think modifyF from monocle)
-  def via[G[_]](f: TestRun[F] => TestRun[G]): Test[G] = Test(name, f(result))
-}
+//todo rename result to run
+final case class Test[+F[_]](name: String, result: TestRun[F])
 
 sealed trait TestRun[+F[_]] extends Product with Serializable {
-
-  //todo signature, changing effects
-  def via[F2[a] >: F[a]](f: F[NonEmptyList[Assertion]] => F2[NonEmptyList[Assertion]]): TestRun[F2] = this match {
-    case TestRun.Eval(effect)              => TestRun.Eval(f(effect))
-    case TestRun.Pure(_) | TestRun.Lazy(_) => this
-  }
 
   def assertions[F2[a] >: F[a]](implicit applicative: Applicative[F2]): F2[NonEmptyList[Assertion]] = this match {
     case TestRun.Eval(effect) => effect
@@ -166,31 +134,3 @@ object Assertions {
         ref.update(_.concat(Chain.fromSeq(assertions.toList)))
     }
 }
-//just some ramblings about aspects
-//
-// deflake -- defined on single test by default
-// customize to apply on whole suites
-// deflake.suites
-// deflake.everything
-//
-// ignore -- defined on assertion by default (ignores assertion it's passed on)
-// ignore(suite) - ignores entire suite straight away
-// ignore(everything) - ignores everything
-// ignore.tests(everything) - ignores each test in everything
-// ignore.assertions(everything)
-// ignore.suite(everything)
-//
-// heuristic - given scope <♾, internal>, can be applied on anything that's > internal.
-// default behavior is for the whole X it's applied on. Can be further scoped up to the point of internal.
-// e.g. aspect defined for scope up to Test, e.g. `caching`:
-// caching(assertion) -- compile error
-// caching(test) -- caches test
-// caching(suite) -- caches whole suite together
-// caching.tests(suite) -- caches each test in suite individually
-// caching.assertions -- doesn't compile
-// caching.tests(everything) -- caches each test in set of suites
-//
-// basically:
-// operator.external(external) == operator(external)
-// operator.internal1(external) == external.via(operator)
-// operator.internal2(external) == external.via(operator.internal1) == external.via(_.via(operator))
