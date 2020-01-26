@@ -34,14 +34,14 @@ final class TaglessTest[F[_]: MyAlg: Sync] extends SuiteClass[F] {
     tests(
       test("first tagless")(
         (MyAlg[F].reset *> MyAlg[F].hello, MyAlg[F].hello).mapN { (before, after) =>
-          ensureEqual(before, 1) |+| ensureEqual(after, 2)
+          ensureEqualM(before, 1) |+| ensureEqualM(after, 2)
         }
       ),
       testMonadic[F]("monadic tagless") { implicit assertions =>
         for {
           _      <- MyAlg[F].reset
           before <- MyAlg[F].hello
-          _      <- assertions.add(ensureEqual(before, 1))
+          _      <- ensureEqualM(before, 1)
           after  <- MyAlg[F].hello
           _      <- assertions.add(ensureEqual(after, 2))
         } yield ()

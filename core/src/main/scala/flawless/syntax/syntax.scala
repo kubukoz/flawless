@@ -32,7 +32,7 @@ object dsl {
     * Provides access to assertions in a monadic fashion.
     * If no assertions are added, the test completes with a single successful assertion.
     */
-  def testMonadic[F[_]: Sync](name: String)(assertions: Assert[F] => F[Unit]): NonEmptyList[Test[F]] =
+  def testMonadic[F[_]: Sync](name: String)(assertions: Assert.Aux[F, F[Unit]] => F[Unit]): NonEmptyList[Test[F]] =
     test[F](name) {
       Ref[F]
         .of(Assertion.successful)
@@ -49,6 +49,9 @@ object dsl {
     NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions))))
 
   def ensure[A](value: A, predicate: Predicate[A]): Assertion = predicate(value)
+
+  def ensureEqualM[A: Diff: Show, F[_]](actual: A, expected: A)(implicit assert: Assert[F]): assert.Out =
+    assert.add(ensureEqual(actual, expected))
 
   def ensureEqual[A: Diff: Show](actual: A, expected: A): Assertion =
     ensure(actual, predicates.all.equalTo(expected))

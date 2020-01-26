@@ -210,13 +210,21 @@ object TestRun {
 }
 
 trait Assert[F[_]] {
-  def add(assertion: Assertion): F[Unit]
+  type Out
+
+  def add(assertion: Assertion): Out
 }
 
 object Assert {
+  type Aux[F[_], O] = Assert[F] { type Out = O }
 
-  def refInstance[F[_]: Applicative](ref: Ref[F, Assertion]): Assert[F] =
-    new Assert[F] {
-      def add(assertion: Assertion): F[Unit] = ref.update(_ |+| assertion)
-    }
+  def instance[F[_], O](f: Assertion => O): Aux[F, O] = new Assert[F] {
+    type Out = O
+    def add(assertion: Assertion): Out = f(assertion)
+  }
+
+  def refInstance[F[_]: Applicative](ref: Ref[F, Assertion]): Aux[F, F[Unit]] =
+    instance(a => ref.update(_ |+| a))
+
+  implicit val idInstance: Aux[Id, Assertion] = instance(identity)
 }
