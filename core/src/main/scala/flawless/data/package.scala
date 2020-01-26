@@ -20,7 +20,7 @@ import cats.Functor
 import cats.FlatMap
 
 import Suite.algebra
-import cats.kernel.Monoid
+import flawless.dsl.NoEffect
 import cats.kernel.Semigroup
 
 sealed trait Assertion extends Product with Serializable {
@@ -81,7 +81,7 @@ sealed trait Suite[+F[_]] extends Product with Serializable {
     Suite.suspend(go(this))
   }
 
-  private[flawless] def interpret[F2[a] >: F[a]](implicit interpreter: Interpreter[F2]): F2[Suite[Id]] =
+  private[flawless] def interpret[F2[a] >: F[a]](implicit interpreter: Interpreter[F2]): F2[Suite[NoEffect]] =
     interpreter.interpret(this)
 
   //I swear, this variance thing is going to end this library

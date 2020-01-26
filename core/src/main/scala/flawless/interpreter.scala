@@ -12,6 +12,7 @@ import cats.tagless.finalAlg
 import cats.effect.ConsoleOut
 import Interpreter.InterpretOne
 import flawless.data.Suite
+import flawless.dsl.NoEffect
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -24,7 +25,7 @@ trait Interpreter[F[_]] {
 
 object Interpreter {
   //A type alias for an action that interprets a single instance of Algebra (e.g. suite or test)
-  type InterpretOne[Algebra[_[_]], F[_]] = Algebra[F] => F[Algebra[Id]]
+  type InterpretOne[Algebra[_[_]], F[_]] = Algebra[F] => F[Algebra[NoEffect]]
 
   implicit def defaultInterpreter[F[_]: Monad: Reporter]: Interpreter[F] =
     new Interpreter[F] {
@@ -32,7 +33,7 @@ object Interpreter {
       val repo = Reporter[F]
 
       private val interpretTest: InterpretOne[Test, F] = { test =>
-        def finish(results: NonEmptyList[Assertion]): Test[Id] = Test(test.name, TestRun.Pure(results))
+        def finish(results: NonEmptyList[Assertion]): Test[NoEffect] = Test(test.name, TestRun.Pure(results))
 
         test.result match {
           //this is a GADT skolem - you think I'd know what that means by now...
@@ -43,7 +44,10 @@ object Interpreter {
       }
 
       private val interpretSuite: InterpretOne[Suite.algebra.One, F] = suite =>
-        suite.tests.nonEmptyTraverse(Reporter[F].reportTest(interpretTest)).map(Suite.algebra.One[Id](suite.name, _))
+        suite
+          .tests
+          .nonEmptyTraverse(Reporter[F].reportTest(interpretTest))
+          .map(Suite.algebra.One[NoEffect](suite.name, _))
 
       import Suite.algebra._
 
@@ -74,7 +78,7 @@ object Reporter {
 
       //this is going to need access to a summarizer of tests,
       //so that it can display the amount of assertions that succeeded, failed, etc., with colors
-      val reportTest: (Test[F] => F[Test[Id]]) => Test[F] => F[Test[Id]] = interpret =>
+      val reportTest: (Test[F] => F[Test[NoEffect]]) => Test[F] => F[Test[NoEffect]] = interpret =>
         test =>
           for {
             _      <- putTest("Starting test: " + test.name)
@@ -84,7 +88,7 @@ object Reporter {
 
       import Suite.algebra.One
 
-      val reportSuite: (One[F] => F[One[Id]]) => One[F] => F[One[Id]] =
+      val reportSuite: (One[F] => F[One[NoEffect]]) => One[F] => F[One[NoEffect]] =
         interpret =>
           suite =>
             for {
