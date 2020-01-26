@@ -26,10 +26,9 @@ val commonSettings = Seq(
   scalacOptions -= "-Xfatal-warnings",
   libraryDependencies ++= List(
     "org.typelevel" %% "cats-tagless-macros" % "0.11",
-    "com.github.julien-truffaut" %% "monocle-macro" % "2.0.1",
+    "com.github.julien-truffaut" %% "monocle" % "2.0.1",
     "org.typelevel" %% "cats-effect" % "2.0.0",
     "dev.profunktor" %% "console4cats" % "0.8.1",
-    "com.lihaoyi" %% "sourcecode" % "0.2.0",
     "com.softwaremill.diffx" %% "diffx-core" % "0.3.16"
   ) ++ compilerPlugins
 )
