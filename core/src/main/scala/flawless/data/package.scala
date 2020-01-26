@@ -16,6 +16,10 @@ import cats.effect.Resource
 import cats.effect.Bracket
 import flawless.data.Assertion.Failed
 import flawless.data.Assertion.Successful
+import cats.Functor
+import cats.FlatMap
+
+import Suite.algebra
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -36,12 +40,8 @@ object Assertion {
 sealed trait Traversal[F[_]] extends Product with Serializable {
 
   final def traverse[S[_]: NonEmptyTraverse, A, B](as: S[A])(f: A => F[B]): F[S[B]] = this match {
-    case Traversal.Sequential(a) =>
-      implicit val apply = a
-      as.nonEmptyTraverse(f)
-    case Traversal.Parallel(nep) =>
-      implicit val parallel = nep
-      Parallel.parNonEmptyTraverse(as)(f)
+    case Traversal.Sequential(a) => as.nonEmptyTraverse(f)(a)
+    case Traversal.Parallel(nep) => Parallel.parNonEmptyTraverse(as)(f)(NonEmptyTraverse[S], nep)
   }
 
   final def sequence[S[_]: NonEmptyTraverse, A](as: S[F[A]]): F[S[A]] = traverse(as)(identity)
@@ -61,7 +61,26 @@ object Traversal {
 }
 
 sealed trait Suite[+F[_]] extends Product with Serializable {
-  def interpret[F2[a] >: F[a]](implicit interpreter: Interpreter[F2]): F2[Suite[Id]] = interpreter.interpret(this)
+
+  //This will probably be an aspect later
+  def renameEach[F2[a] >: F[a]: FlatMap](modName: String => F2[String]): Suite[F2] = {
+
+    //todo what about stack safety in the case of effectless tests?
+    def go(self: Suite[F2]): F2[Suite[F2]] = self match {
+      case o: algebra.One[f] =>
+        //typing newName manually is needed due to GADT limitation
+        Functor[f].map(modName(o.name))(algebra.One[f](_: String, o.tests))
+
+      case s: algebra.Sequence[f]  => s.traversal.traverse(s.suites)(go)
+      case r: algebra.RResource[f] => r.resuite.evalMap(go)(r.bracket)
+      case s: algebra.Suspend[f]   => s.suite.flatMap(go)
+    }
+
+    Suite.suspend(go(this))
+  }
+
+  private[flawless] def interpret[F2[a] >: F[a]](implicit interpreter: Interpreter[F2]): F2[Suite[Id]] =
+    interpreter.interpret(this)
 
   //I swear, this variance thing is going to end this library
   def zip[F2[a] >: F[a]](another: Suite[F2]): Suite[F2] = ???
@@ -71,35 +90,37 @@ sealed trait Suite[+F[_]] extends Product with Serializable {
 }
 
 object Suite {
-  def one[F[_]](name: String, tests: NonEmptyList[Test[F]]): Suite[F] = One(name, tests)
+  def one[F[_]](name: String, tests: NonEmptyList[Test[F]]): Suite[F] = algebra.One(name, tests)
 
   def parallel[F[_]: NonEmptyParallel](first: Suite[F], rest: Suite[F]*): Suite[F] =
     parSequence(NonEmptyList(first, rest.toList))
 
   def parSequence[F[_]: NonEmptyParallel](suitesSequence: NonEmptyList[Suite[F]]): Suite[F] =
-    Sequence[F](suitesSequence, Traversal.parallel)
+    algebra.Sequence[F](suitesSequence, Traversal.parallel)
 
   def sequential[F[_]: Apply](first: Suite[F], rest: Suite[F]*): Suite[F] =
     sequence(NonEmptyList(first, rest.toList))
 
   def sequence[F[_]: Apply](suitesSequence: NonEmptyList[Suite[F]]): Suite[F] =
-    Sequence[F](suitesSequence, Traversal.sequential)
+    algebra.Sequence[F](suitesSequence, Traversal.sequential)
 
   def resource[F[_]: Bracket[*[_], Throwable]](suitesInResource: Resource[F, Suite[F]]): Suite[F] =
-    RResource(suitesInResource, Bracket[F, Throwable])
+    algebra.RResource(suitesInResource, Bracket[F, Throwable])
 
-  def suspend[F[_]](suites: F[Suite[F]]): Suite[F] = Suspend(suites)
+  def suspend[F[_]](suites: F[Suite[F]]): Suite[F] = algebra.Suspend(suites)
 
-  final case class One[F[_]](name: String, tests: NonEmptyList[Test[F]]) extends Suite[F]
-  final case class Sequence[F[_]](suites: NonEmptyList[Suite[F]], traversal: Traversal[F]) extends Suite[F]
-  final case class Suspend[F[_]](suite: F[Suite[F]]) extends Suite[F]
-  final case class RResource[F[_]](resuite: Resource[F, Suite[F]], bracket: Bracket[F, Throwable]) extends Suite[F]
+  private[flawless] object algebra {
+    final case class One[F[_]](name: String, tests: NonEmptyList[Test[F]]) extends Suite[F]
+    final case class Sequence[F[_]](suites: NonEmptyList[Suite[F]], traversal: Traversal[F]) extends Suite[F]
+    final case class Suspend[F[_]](suite: F[Suite[F]]) extends Suite[F]
+    final case class RResource[F[_]](resuite: Resource[F, Suite[F]], bracket: Bracket[F, Throwable]) extends Suite[F]
+  }
 
-  private[flawless] val flatten: Suite[Id] => NonEmptyList[Suite.One[Id]] = {
-    case Sequence(suites, _) => suites.flatMap(flatten)
-    case o @ One(_, _)       => o.pure[NonEmptyList]
-    case Suspend(suites)     => flatten(suites)
-    case RResource(_, _)     => throw new AssertionError("Impossible")
+  private[flawless] val flatten: Suite[Id] => NonEmptyList[algebra.One[Id]] = {
+    case algebra.Sequence(suites, _) => suites.flatMap(flatten)
+    case o @ algebra.One(_, _)       => o.pure[NonEmptyList]
+    case algebra.Suspend(suites)     => flatten(suites)
+    case algebra.RResource(_, _)     => throw new AssertionError("Impossible! Id doesn't form resources.")
   }
 }
 

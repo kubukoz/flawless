@@ -12,10 +12,6 @@ import cats.tagless.finalAlg
 import cats.effect.ConsoleOut
 import Interpreter.InterpretOne
 import flawless.data.Suite
-import flawless.data.Suite.Sequence
-import flawless.data.Suite.One
-import flawless.data.Suite.RResource
-import flawless.data.Suite.Suspend
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -46,8 +42,10 @@ object Interpreter {
         }
       }
 
-      private val interpretSuite: InterpretOne[Suite.One, F] = suite =>
-        suite.tests.nonEmptyTraverse(Reporter[F].reportTest(interpretTest)).map(Suite.One[Id](suite.name, _))
+      private val interpretSuite: InterpretOne[Suite.algebra.One, F] = suite =>
+        suite.tests.nonEmptyTraverse(Reporter[F].reportTest(interpretTest)).map(Suite.algebra.One[Id](suite.name, _))
+
+      import Suite.algebra._
 
       val interpret: InterpretOne[Suite, F] = {
         case s: Sequence[f]  => s.traversal.traverse(s.suites)(interpret).map(Suite.sequence[f](_))
@@ -61,7 +59,7 @@ object Interpreter {
 // @finalAlg
 trait Reporter[F[_]] {
   def reportTest: InterpretOne[Test, F] => InterpretOne[Test, F]
-  def reportSuite: InterpretOne[Suite.One, F] => InterpretOne[Suite.One, F]
+  def reportSuite: InterpretOne[Suite.algebra.One, F] => InterpretOne[Suite.algebra.One, F]
 }
 
 object Reporter {
@@ -84,12 +82,15 @@ object Reporter {
             _      <- putTest("Finished test: " + test.name + s", result: ${result.result}")
           } yield result
 
-      val reportSuite: (Suite.One[F] => F[Suite.One[Id]]) => Suite.One[F] => F[Suite.One[Id]] = interpret =>
-        suite =>
-          for {
-            _      <- putSuite("Starting suite: " + suite.name)
-            result <- interpret(suite)
-            _      <- putSuite("Finished suite: " + suite.name + s", result: ${result.tests}")
-          } yield result
+      import Suite.algebra.One
+
+      val reportSuite: (One[F] => F[One[Id]]) => One[F] => F[One[Id]] =
+        interpret =>
+          suite =>
+            for {
+              _      <- putSuite("Starting suite: " + suite.name)
+              result <- interpret(suite)
+              _      <- putSuite("Finished suite: " + suite.name + s", result: ${result.tests}")
+            } yield result
     }
 }

@@ -13,7 +13,6 @@ import _root_.doobie.util.ExecutionContexts
 import _root_.doobie.hikari.HikariTransactor
 import cats.effect.Blocker
 import flawless.TestApp
-import cats.effect.Resource
 import cats.implicits._
 
 object ExampleTests extends IOApp with TestApp {
@@ -29,8 +28,8 @@ object ExampleTests extends IOApp with TestApp {
     IOSuite
   )
 
-  val dbTests: Resource[IO, NonEmptyList[Suites[IO]]] = {
-    for {
+  val dbTests: Suite[IO] = {
+    val xa = for {
       connectEc <- ExecutionContexts.fixedThreadPool[IO](10)
       blocker   <- Blocker[IO]
       transactor <- HikariTransactor.newHikariTransactor[IO](
@@ -41,22 +40,28 @@ object ExampleTests extends IOApp with TestApp {
                      connectEc,
                      blocker
                    )
-    } yield NonEmptyList.of(new DoobieQueryTests(transactor).runSuite.toSuites).combineN(10)
+    } yield transactor
+
+    Suite.resource[IO] {
+      xa.map { transactor =>
+        Suite.parSequence(NonEmptyList.of(new DoobieQueryTests(transactor).runSuite).combineN(10))
+      }
+    }
   }
 
-  val runSequentials = Suites.sequential(
-    Suites.parSequence(sequentialTests.map(_.runSuite.toSuites)),
-    Suites.resource(dbTests.map(Suites.parSequence(_)))
+  val runSequentials = Suite.sequential(
+    Suite.parSequence(sequentialTests.map(_.runSuite)),
+    dbTests
   )
 
-  val runFlaky = FlakySuite.runSuite.toSuites
+  val runFlaky = FlakySuite.runSuite
 
   val runExpensives =
-    Suites.parSequence(NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite.toSuites: Suites[IO]))
+    Suite.parSequence[IO](NonEmptyList.fromListUnsafe(List.fill(10)(ExpensiveSuite)).map(_.runSuite))
 
-  val runParallels = Suites.parSequence(parallelTests.map(_.runSuite.toSuites))
+  val runParallels = Suite.parSequence(parallelTests.map(_.runSuite))
 
-  val testRange = Suites.sequential(runFlaky, runExpensives, runParallels, runSequentials)
+  val testRange = Suite.sequential(runFlaky, runExpensives, runParallels, runSequentials)
 
   override def run(args: List[String]): IO[ExitCode] =
     runTests(args)(
