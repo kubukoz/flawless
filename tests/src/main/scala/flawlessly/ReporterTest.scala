@@ -36,17 +36,13 @@ object ReporterTest extends SuiteClass[NoEffect] {
           )
         }
 
-        val test1Result = "Pure(One(Successful))"
-        val test2Result = "Pure(One(Successful))"
-        val suiteResult = show"NonEmptyList(Test(test 1,$test1Result), Test(test 2,$test2Result))"
-
         val expectedOut =
           show"""Starting suite: suite 1
                 |  Starting test: test 1
-                |  Finished test: test 1, result: $test1Result
+                |  Finished test: test 1
                 |  Starting test: test 2
-                |  Finished test: test 2, result: $test2Result
-                |Finished suite: suite 1, result: $suiteResult""".stripMargin.linesIterator.toList.map(_ + "\n")
+                |  Finished test: test 2
+                |Finished suite: suite 1""".stripMargin.linesIterator.toList.map(_ + "\n")
 
         ensureEqual(interpreter.interpret(testedSuite).written.toList, expectedOut)
       }
