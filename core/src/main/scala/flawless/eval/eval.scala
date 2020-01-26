@@ -5,7 +5,6 @@ import cats.FlatMap
 import cats.data.NonEmptyList
 import cats.effect.ExitCode
 import cats.Id
-import flawless.stats.RunStats
 import cats.implicits._
 import flawless.data.Test
 

@@ -1,4 +1,4 @@
-package flawless.stats
+package flawless.eval
 
 import cats.Eq
 import cats.Foldable

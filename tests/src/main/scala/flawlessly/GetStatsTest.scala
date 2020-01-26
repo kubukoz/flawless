@@ -4,7 +4,7 @@ import cats.implicits._
 import cats.Id
 import flawless._
 import flawless.syntax._
-import flawless.stats._
+import flawless.eval.RunStats
 
 object GetStatsTest extends SuiteClass[NoEffect] {
   import RunStats.Stat
