@@ -5,6 +5,8 @@ import cats.effect.Sync
 import cats.effect.Console
 import cats.effect.SyncConsole
 import cats.effect.IO
+import flawless.eval.Interpreter
+import flawless.eval.Reporter
 
 trait TestApp { self: IOApp =>
   implicit val console: Console[IO] = Console.io

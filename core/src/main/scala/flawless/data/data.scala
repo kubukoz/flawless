@@ -1,6 +1,5 @@
 package flawless.data
 
-import flawless.Interpreter
 import cats.data.NonEmptyList
 import cats.implicits._
 import cats.Applicative
@@ -21,6 +20,7 @@ import cats.kernel.Monoid
 import flawless.data.Assertion.Result
 import flawless.data.Assertion.One
 import flawless.data.Assertion.All
+import flawless.eval.Interpreter
 
 sealed trait Assertion extends Product with Serializable {
 

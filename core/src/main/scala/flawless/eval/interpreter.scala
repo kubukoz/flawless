@@ -1,4 +1,4 @@
-package flawless
+package flawless.eval
 
 import cats.implicits._
 import cats.Monad
@@ -9,6 +9,8 @@ import flawless.data.TestRun
 import cats.tagless.finalAlg
 import cats.effect.ConsoleOut
 import Interpreter.InterpretOne
+import flawless.data.Suite
+import flawless.NoEffect
 
 @finalAlg
 trait Interpreter[F[_]] {

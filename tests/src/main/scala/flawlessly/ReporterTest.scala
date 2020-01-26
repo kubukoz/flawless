@@ -6,11 +6,11 @@ import flawless.data.Suite
 import flawless.dsl._
 import flawless._
 import cats.implicits._
-import flawless.Reporter
 import cats.effect.ConsoleOut
 import cats.data.Writer
 import cats.data.Chain
-import flawless.Interpreter
+import flawless.eval.Reporter
+import flawless.eval.Interpreter
 import cats.Show
 
 object ReporterTest extends SuiteClass[NoEffect] {
