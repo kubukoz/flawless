@@ -13,9 +13,8 @@ trait TestApp { self: IOApp =>
 
   implicit def defaultInterpreter[F[_]: Sync]: Interpreter[F] = {
     implicit val console: Console[F] = SyncConsole.stdio[F]
-    implicit val reporter: Reporter[F] = Reporter.consoleInstance[F]
 
-    Interpreter.defaultInterpreter[F]
+    Interpreter.defaultInterpreter[F](Reporter.mkConsoleInstance)
   }
 }
 
