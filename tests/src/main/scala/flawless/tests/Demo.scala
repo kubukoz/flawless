@@ -53,7 +53,7 @@ object Demo extends IOApp {
 
     val currentString = (n < 100).guard[Option].as(Console.BLUE + done).combineAll
 
-    val remainingString = Console.RESET + (notdone * (max - n - (if (currentString.nonEmpty) 1 else 0)))
+    val remainingString = Console.RESET + (notdone * (max - n - currentString.nonEmpty.guard[List].size))
 
     val completedResults = results.flatMap { case (count, b) => List.fill(count)(b) }.take(n)
 
