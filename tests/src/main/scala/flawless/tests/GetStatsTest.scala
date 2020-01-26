@@ -32,7 +32,7 @@ object GetStatsTest extends SuiteClass[NoEffect] {
       pureTest("1 test: 1 succ / 1 fail") {
         val input = suite[Id]("foo") {
           pureTest("Example") {
-            ensure(1, equalTo(1)) <+> ensure(1, equalTo(2))
+            ensure(1, equalTo(1)) |+| ensure(1, equalTo(2))
           }
         }
 
@@ -48,7 +48,7 @@ object GetStatsTest extends SuiteClass[NoEffect] {
       pureTest("1 test: 1 succ / 2 fail") {
         val input = suite[Id]("foo") {
           pureTest("Example") {
-            ensure(1, equalTo(1)) <+> ensure(1, equalTo(2)).combineN(2)
+            ensure(1, equalTo(1)) |+| ensure(1, equalTo(2)).combineN(2)
           }
         }
 

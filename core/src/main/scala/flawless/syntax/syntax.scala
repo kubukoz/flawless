@@ -4,7 +4,6 @@ import flawless.data._
 import cats.data._
 import cats.effect.Sync
 import cats.effect.concurrent.Ref
-import cats.data.Chain
 import cats.implicits._
 import com.softwaremill.diffx.Diff
 import com.softwaremill.diffx.DiffResult
@@ -26,7 +25,7 @@ object dsl {
   def tests[F[_]](firstTest: NonEmptyList[Test[F]], rest: NonEmptyList[Test[F]]*): NonEmptyList[Test[F]] =
     NonEmptyList(firstTest, rest.toList).reduce
 
-  def test[F[_]](name: String)(assertions: F[NonEmptyList[Assertion]]): NonEmptyList[Test[F]] =
+  def test[F[_]](name: String)(assertions: F[Assertion]): NonEmptyList[Test[F]] =
     NonEmptyList.one(Test(name, TestRun.Eval(assertions)))
 
   /**
@@ -36,24 +35,24 @@ object dsl {
   def testMonadic[F[_]: Sync](name: String)(assertions: Assertions[F] => F[Unit]): NonEmptyList[Test[F]] =
     test[F](name) {
       Ref[F]
-        .of(Chain.empty[Assertion])
-        .flatMap { ref =>
-          assertions(Assertions.refInstance(ref)) *> ref.get
+        .of(Assertion.successful)
+        .flatTap { ref =>
+          assertions(Assertions.refInstance(ref))
         }
-        .map(_.toList.toNel.getOrElse(NonEmptyList.one(Assertion.Successful)))
+        .flatMap(_.get)
     }
 
-  def pureTest(name: String)(assertions: NonEmptyList[Assertion]): NonEmptyList[Test[Nothing]] =
+  def pureTest(name: String)(assertions: Assertion): NonEmptyList[Test[Nothing]] =
     NonEmptyList.one(Test(name, TestRun.Pure(assertions)))
 
-  def lazyTest(name: String)(assertions: => NonEmptyList[Assertion]): NonEmptyList[Test[Nothing]] =
+  def lazyTest(name: String)(assertions: => Assertion): NonEmptyList[Test[Nothing]] =
     NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions))))
 
-  def ensure[A](value: A, predicate: Predicate[A]): NonEmptyList[Assertion] = NonEmptyList.one(predicate(value))
+  def ensure[A](value: A, predicate: Predicate[A]): Assertion = predicate(value)
 
-  def ensureEqual[A: Diff: Show](actual: A, expected: A): NonEmptyList[Assertion] =
+  def ensureEqual[A: Diff: Show](actual: A, expected: A): Assertion =
     ensure(actual, predicates.all.equalTo(expected))
-  def assertion(cond: Boolean, ifFalse: String): NonEmptyList[Assertion] = ensure(cond, predicates.all.isTrue(ifFalse))
+  def assertion(cond: Boolean, ifFalse: String): Assertion = ensure(cond, predicates.all.isTrue(ifFalse))
 }
 
 object predicates {
@@ -62,24 +61,24 @@ object predicates {
     import dsl.Predicate
 
     def greaterThan[A: Order: Show](another: A): Predicate[A] =
-      a => if (a > another) Assertion.Successful else Assertion.Failed(show"$a was not greater than $another")
+      a => if (a > another) Assertion.successful else Assertion.failed(show"$a was not greater than $another")
 
     def equalTo[T: Diff: Show](another: T): Predicate[T] = {
       implicit val showDiff: Show[DiffResult] = _.show
 
       a =>
         Diff[T].apply(a, another) match {
-          case diff if diff.isIdentical => Assertion.Successful
-          case diff                     => Assertion.Failed(show"$a (actual) was not equal to $another (expected). Diff: $diff")
+          case diff if diff.isIdentical => Assertion.successful
+          case diff                     => Assertion.failed(show"$a (actual) was not equal to $another (expected). Diff: $diff")
         }
     }
 
-    val successful: Predicate[Any] = _ => Assertion.Successful
-    def failed(message: String): Predicate[Any] = _ => Assertion.Failed(message)
+    val successful: Predicate[Any] = _ => Assertion.successful
+    def failed(message: String): Predicate[Any] = _ => Assertion.failed(message)
 
     def isTrue(ifFalse: String): Predicate[Boolean] = {
-      case true  => Assertion.Successful
-      case false => Assertion.Failed(ifFalse)
+      case true  => Assertion.successful
+      case false => Assertion.failed(ifFalse)
     }
   }
 }

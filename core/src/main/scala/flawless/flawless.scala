@@ -37,7 +37,7 @@ package object flawless {
       AnsiColor.RED + s + AnsiColor.RESET
 
     def inColor(test: Test[Id]): String = {
-      val assertions = test.result.assertions
+      val assertions = test.result.assertions.flatMap(_.results)
 
       val successful = assertions.forall(_.isSuccessful)
       val testName =
@@ -45,7 +45,7 @@ package object flawless {
         else inRed(show"Failed: ${test.name}")
 
       val failedAssertions = assertions.toList.collect {
-        case flawless.data.Assertion.Failed(failure) =>
+        case flawless.data.Assertion.AssertionResult.Failed(failure) =>
           inRed(
             // show"${failure.text} (${failure.location})"
             failure //todo

@@ -33,7 +33,7 @@ object Interpreter {
       val repo = Reporter[F]
 
       private val interpretTest: InterpretOne[Test, F] = { test =>
-        def finish(results: NonEmptyList[Assertion]): Test[NoEffect] = Test(test.name, TestRun.Pure(results))
+        def finish(results: Assertion): Test[NoEffect] = Test(test.name, TestRun.Pure(results))
 
         test.result match {
           //this is a GADT skolem - you think I'd know what that means by now...
@@ -60,14 +60,13 @@ object Interpreter {
     }
 }
 
-// @finalAlg
+@finalAlg
 trait Reporter[F[_]] {
   def reportTest: InterpretOne[Test, F] => InterpretOne[Test, F]
   def reportSuite: InterpretOne[Suite.algebra.One, F] => InterpretOne[Suite.algebra.One, F]
 }
 
 object Reporter {
-  def apply[F[_]](implicit F: Reporter[F]): Reporter[F] = F
 
   def consoleInstance[F[_]: FlatMap: ConsoleOut]: Reporter[F] =
     new Reporter[F] {

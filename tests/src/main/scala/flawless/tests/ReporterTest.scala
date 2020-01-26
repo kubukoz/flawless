@@ -34,8 +34,8 @@ object ReporterTest extends SuiteClass[NoEffect] {
           )
         }
 
-        val test1Result = "Pure(NonEmptyList(Successful))"
-        val test2Result = "Pure(NonEmptyList(Successful))"
+        val test1Result = "Pure(One(Successful))"
+        val test2Result = "Pure(One(Successful))"
         val suiteResult = show"NonEmptyList(Test(test 1,$test1Result), Test(test 2,$test2Result))"
 
         val expectedOut =

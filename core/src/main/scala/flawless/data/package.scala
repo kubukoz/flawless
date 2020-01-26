@@ -10,30 +10,53 @@ import cats.Apply
 import cats.Parallel
 import cats.NonEmptyTraverse
 import cats.effect.concurrent.Ref
-import cats.data.Chain
-import cats.Foldable
 import cats.effect.Resource
 import cats.effect.Bracket
-import flawless.data.Assertion.Failed
-import flawless.data.Assertion.Successful
 import cats.Functor
 import cats.FlatMap
 
-import Suite.algebra
 import flawless.dsl.NoEffect
 import cats.kernel.Semigroup
+import cats.kernel.Monoid
+import flawless.data.Assertion.AssertionResult
+import flawless.data.Assertion.One
+import flawless.data.Assertion.All
 
 sealed trait Assertion extends Product with Serializable {
 
-  def isSuccessful: Boolean = this match {
-    case Failed(_)  => false
-    case Successful => true
+  def results: NonEmptyList[AssertionResult] = this match {
+    case One(result)     => NonEmptyList.one(result)
+    case All(assertions) => assertions.flatMap(_.results)
   }
 }
 
 object Assertion {
-  case object Successful extends Assertion
-  final case class Failed(message: String) extends Assertion
+  val successful: Assertion = one(AssertionResult.Successful)
+  def failed(message: String): Assertion = one(AssertionResult.Failed(message))
+
+  def one(result: AssertionResult): Assertion = One(result)
+
+  sealed trait AssertionResult extends Product with Serializable {
+
+    def isSuccessful: Boolean = this match {
+      case AssertionResult.Failed(_)  => false
+      case AssertionResult.Successful => true
+    }
+  }
+
+  object AssertionResult {
+    case object Successful extends AssertionResult
+    final case class Failed(message: String) extends AssertionResult
+  }
+
+  final case class One(result: AssertionResult) extends Assertion
+  final case class All(assertions: NonEmptyList[Assertion]) extends Assertion
+
+  implicit val assertionMonoid: Monoid[Assertion] = new Monoid[Assertion] {
+    //todo optimize for nested sequences
+    def combine(x: Assertion, y: Assertion): Assertion = All(NonEmptyList.of(x, y))
+    def empty: Assertion = successful
+  }
 }
 
 /**
@@ -173,7 +196,7 @@ final case class Test[+F[_]](name: String, result: TestRun[F])
 
 sealed trait TestRun[+F[_]] extends Product with Serializable {
 
-  def assertions[F2[a] >: F[a]](implicit applicative: Applicative[F2]): F2[NonEmptyList[Assertion]] = this match {
+  def assertions[F2[a] >: F[a]](implicit applicative: Applicative[F2]): F2[Assertion] = this match {
     case TestRun.Eval(effect) => effect
     case TestRun.Pure(result) => result.pure[F2]
     case TestRun.Lazy(result) => result.value.pure[F2]
@@ -181,23 +204,19 @@ sealed trait TestRun[+F[_]] extends Product with Serializable {
 }
 
 object TestRun {
-  final case class Eval[F[_]](effect: F[NonEmptyList[Assertion]]) extends TestRun[F]
-  final case class Pure(result: NonEmptyList[Assertion]) extends TestRun[Nothing]
-  final case class Lazy(result: cats.Eval[NonEmptyList[Assertion]]) extends TestRun[Nothing]
+  final case class Eval[F[_]](effect: F[Assertion]) extends TestRun[F]
+  final case class Pure(result: Assertion) extends TestRun[Nothing]
+  final case class Lazy(result: cats.Eval[Assertion]) extends TestRun[Nothing]
 }
 
 trait Assertions[F[_]] {
   def add(assertion: Assertion): F[Unit]
-  def addAll[S[_]: Foldable](assertions: S[Assertion]): F[Unit]
 }
 
 object Assertions {
 
-  def refInstance[F[_]: Applicative](ref: Ref[F, Chain[Assertion]]): Assertions[F] =
+  def refInstance[F[_]: Applicative](ref: Ref[F, Assertion]): Assertions[F] =
     new Assertions[F] {
-      def add(assertion: Assertion): F[Unit] = ref.update(_.append(assertion))
-
-      def addAll[S[_]: Foldable](assertions: S[Assertion]): F[Unit] =
-        ref.update(_.concat(Chain.fromSeq(assertions.toList)))
+      def add(assertion: Assertion): F[Unit] = ref.update(_ |+| assertion)
     }
 }
