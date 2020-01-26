@@ -78,24 +78,24 @@ sealed trait Suite[+F[_]] extends Product with Serializable {
   /**
     * Combine the two sets of suites sequentially.
     */
-  def zip[F2[a] >: F[a]: Apply](another: Suite[F2]): Suite[F2] = this |+| another
+  def zip[F2[a] >: F[a]: Apply](another: Suite[F2]): Suite[F2] = Suite.sequential(this, another)
 
   /**
     * Combine the two sets of suites in parallel.
     * */
-  def parZip[F2[a] >: F[a]: NonEmptyParallel](another: Suite[F2]): Suite[F2] = this |&| another
+  def parZip[F2[a] >: F[a]: NonEmptyParallel](another: Suite[F2]): Suite[F2] = Suite.parallel(this, another)
 
   /**
     * Alias for [[zip]].
     */
-  def |+|[F2[a] >: F[a]: Apply](another: Suite[F2]): Suite[F2] = Semigroup[Suite[F2]].combine(this, another)
+  def |+|[F2[a] >: F[a]: Apply](another: Suite[F2]): Suite[F2] = this zip another
 
   /**
     * Alias for [[parZip]].
     */
-  def |&|[F2[a] >: F[a]: NonEmptyParallel](another: Suite[F2]): Suite[F2] = Suite.parallel(this, another)
+  def |&|[F2[a] >: F[a]: NonEmptyParallel](another: Suite[F2]): Suite[F2] = this parZip another
 
-  // Duplicate this suite n times. For the sequential version, use semigroup syntax.
+  // Duplicate this suite n times in parallel. For the sequential version, use semigroup syntax.
   def parCombineN[F2[a] >: F[a]: NonEmptyParallel](n: Int): Suite[F2] =
     Suite.parSequence[F2](NonEmptyList.one(this).combineN(n))
 
@@ -131,8 +131,11 @@ object Suite {
 
   def suspend[F[_]](suites: F[Suite[F]]): Suite[F] = algebra.Suspend(suites)
 
+  /**
+    * Semigroup instance that combines suites sequentially.
+    */
   implicit def suiteSemigroup[F[_]: Apply]: Semigroup[Suite[F]] = new Semigroup[Suite[F]] {
-    def combine(x: Suite[F], y: Suite[F]): Suite[F] = Suite.sequential(x, y)
+    def combine(x: Suite[F], y: Suite[F]): Suite[F] = x.zip(y)
   }
 
   def renameEach[F[_]: FlatMap](modName: String => F[String]): Suite[F] => Suite[F] = {
