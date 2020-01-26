@@ -161,7 +161,9 @@ object Assertions {
   def refInstance[F[_]: Applicative](ref: Ref[F, Chain[Assertion]]): Assertions[F] =
     new Assertions[F] {
       def add(assertion: Assertion): F[Unit] = ref.update(_.append(assertion))
-      def addAll[S[_]: Foldable](assertions: S[Assertion]): F[Unit] = assertions.traverse_(add)
+
+      def addAll[S[_]: Foldable](assertions: S[Assertion]): F[Unit] =
+        ref.update(_.concat(Chain.fromSeq(assertions.toList)))
     }
 }
 //just some ramblings about aspects
