@@ -1,7 +1,6 @@
-package flawless.tests
+package flawlessly
 
-import flawless.SuiteClass
-import flawless.data.Suite
+import flawless._
 import flawless.dsl._
 import cats.tagless.finalAlg
 import cats.effect.Sync

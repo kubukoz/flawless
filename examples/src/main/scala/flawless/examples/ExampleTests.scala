@@ -6,13 +6,11 @@ import cats.data.NonEmptyList
 import cats.effect.ExitCode
 import cats.effect.IO
 import cats.effect.IOApp
-import flawless.data._
 import flawless._
 import flawless.examples.doobie.DoobieQueryTests
 import _root_.doobie.util.ExecutionContexts
 import _root_.doobie.hikari.HikariTransactor
 import cats.effect.Blocker
-import flawless.TestApp
 
 object ExampleTests extends IOApp with TestApp {
 

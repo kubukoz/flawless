@@ -1,12 +1,10 @@
-package flawless.tests
+package flawlessly
 
-import flawless.stats._
 import cats.implicits._
 import cats.Id
-import flawless.dsl._
-import flawless.predicates.all._
-import flawless.SuiteClass
-import flawless.data.Suite
+import flawless._
+import flawless.syntax._
+import flawless.stats._
 
 object GetStatsTest extends SuiteClass[NoEffect] {
   import RunStats.Stat

@@ -9,8 +9,6 @@ import flawless.data.TestRun
 import cats.tagless.finalAlg
 import cats.effect.ConsoleOut
 import Interpreter.InterpretOne
-import flawless.data.Suite
-import flawless.dsl.NoEffect
 
 @finalAlg
 trait Interpreter[F[_]] {

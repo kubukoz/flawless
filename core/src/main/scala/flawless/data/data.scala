@@ -15,7 +15,7 @@ import cats.effect.Bracket
 import cats.Functor
 import cats.FlatMap
 
-import flawless.dsl.NoEffect
+import flawless.NoEffect
 import cats.kernel.Semigroup
 import cats.kernel.Monoid
 import flawless.data.Assertion.Result

@@ -19,6 +19,7 @@ This project is a work in progress. Use it at your own responsibility. I expect 
 
 ```scala
 import flawless._
+import flawless.syntax._
 ```
 
 ## Design

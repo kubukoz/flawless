@@ -2,16 +2,30 @@ import cats.effect.ExitCode
 import cats.implicits._
 import flawless.stats.RunStats
 import cats.Id
+import flawless.data.Assertion
+import cats.data.NonEmptyList
+import cats.FlatMap
+import flawless.data.Test
+import cats.Monad
+import cats.Applicative
+import cats.effect.ConsoleOut
 
 package object flawless {
 
-  import cats.data.NonEmptyList
-  import cats.FlatMap
-  import flawless.data.Test
-  import cats.Monad
-  import cats.Applicative
-  import cats.effect.ConsoleOut
-  import flawless.data.Suite
+  // Shamelessly ripped off from fs2's Pure type - this is pure genius.
+  type NoEffect[A] <: Nothing
+
+  type Suite[+F[_]] = flawless.data.Suite[F]
+  val Suite = flawless.data.Suite
+
+  // This name is bad (Predicate implies A => Boolean). Come up with a better name.
+  // Possibly worth newtyping.
+  // This idea is heavily inspired by ZIO Test.
+  type Predicate[-A] = A => Assertion
+
+  object syntax extends api.AllDsl with api.AllPredicates
+  object dsl extends api.AllDsl
+  object predicates extends api.AllPredicates
 
   def loadArgs[F[_]: Applicative](args: List[String]): F[Unit] = {
     val _ = args
@@ -23,7 +37,7 @@ package object flawless {
 
   def summarize[F[_]: ConsoleOut: FlatMap](suites: Suite[Id]): F[ExitCode] = {
     import scala.io.AnsiColor
-    val suitesFlat = Suite.flatten(suites)
+    val suitesFlat = data.Suite.flatten(suites)
 
     val stats = RunStats.fromSuites[NonEmptyList](suitesFlat)
 

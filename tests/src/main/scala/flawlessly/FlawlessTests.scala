@@ -1,4 +1,4 @@
-package flawless.tests
+package flawlessly
 
 import cats.effect.ExitCode
 import cats.effect.IO

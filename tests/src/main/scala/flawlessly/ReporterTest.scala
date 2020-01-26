@@ -1,8 +1,10 @@
-package flawless.tests
+package flawlessly
+
 import flawless.SuiteClass
 
 import flawless.data.Suite
 import flawless.dsl._
+import flawless._
 import cats.implicits._
 import flawless.Reporter
 import cats.effect.ConsoleOut
@@ -21,7 +23,7 @@ object ReporterTest extends SuiteClass[NoEffect] {
 
   implicit val reporter: Reporter[WC] = Reporter.consoleInstance[WC]
 
-  implicit val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
+  val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
 
   val runSuite: Suite[NoEffect] = suite("ReporterTest") {
     tests(
@@ -46,7 +48,7 @@ object ReporterTest extends SuiteClass[NoEffect] {
                 |  Finished test: test 2, result: $test2Result
                 |Finished suite: suite 1, result: $suiteResult""".stripMargin.linesIterator.toList.map(_ + "\n")
 
-        ensureEqual(testedSuite.interpret.written.toList, expectedOut)
+        ensureEqual(interpreter.interpret(testedSuite).written.toList, expectedOut)
       }
     )
   }
