@@ -1,6 +1,5 @@
 package flawless
 
-import flawless.data.Suite
 import cats.effect.IOApp
 import cats.effect.Sync
 import cats.effect.Console
