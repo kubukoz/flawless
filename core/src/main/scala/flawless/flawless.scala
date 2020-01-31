@@ -1,6 +1,5 @@
 import cats.effect.ExitCode
 import cats.implicits._
-import cats.Monad
 import cats.effect.ConsoleOut
 import flawless.data.Assertion
 import flawless.eval.Interpreter
@@ -8,6 +7,12 @@ import flawless.eval.summarize
 import flawless.eval.loadArgs
 
 package object flawless {
+
+  import cats.effect.concurrent.Ref
+
+  import cats.effect.Sync
+
+  import flawless.eval.Reporter
 
   // Shamelessly ripped off from fs2's Pure type - this is pure genius.
   type NoEffect[A] <: Nothing
@@ -24,6 +29,15 @@ package object flawless {
   object dsl extends api.AllDsl
   object predicates extends api.AllPredicates
 
-  def runTests[F[_]: Interpreter: ConsoleOut: Monad](args: List[String])(suites: Suite[F]): F[ExitCode] =
-    loadArgs[F](args) *> suites.interpret.flatMap(summarize[F])
+  def runTests[F[_]: Interpreter: ConsoleOut: Sync](args: List[String])(suites: Suite[F]): F[ExitCode] =
+    loadArgs[F](args).flatMap { args =>
+      Ref[F].of(Reporter.SuiteHistory.initial).flatMap { ref =>
+        import com.olegpy.meow.effects._
+        val reporter = ref.runState { implicit MS =>
+          if (args.visual) Reporter.visual[F] else Reporter.consoleInstance[F]
+        }
+
+        Interpreter[F].interpret(reporter)(suites).flatMap(summarize[F])
+      }
+    }
 }

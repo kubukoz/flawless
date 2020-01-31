@@ -3,19 +3,14 @@ package flawless
 import cats.effect.IOApp
 import cats.effect.Sync
 import cats.effect.Console
-import cats.effect.SyncConsole
 import cats.effect.IO
 import flawless.eval.Interpreter
-import flawless.eval.Reporter
 
 trait TestApp { self: IOApp =>
   implicit val console: Console[IO] = Console.io
 
-  implicit def defaultInterpreter[F[_]: Sync]: Interpreter[F] = {
-    implicit val console: Console[F] = SyncConsole.stdio[F]
-
-    Interpreter.defaultInterpreter[F](Reporter.mkConsoleInstance)
-  }
+  implicit def defaultInterpreter[F[_]: Sync]: Interpreter[F] =
+    Interpreter.defaultInterpreter[F]
 }
 
 /**
