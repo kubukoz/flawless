@@ -126,9 +126,6 @@ sealed trait Suite[+F[_]] extends Product with Serializable {
     * Widen the effect type of this suite.
     */
   def widenF[F2[a] >: F[a]]: Suite[F2] = this
-
-  private[flawless] def interpret[F2[a] >: F[a]](implicit interpreter: Interpreter[F2]): F2[Suite[NoEffect]] =
-    interpreter.interpret(this)
 }
 
 object Suite {

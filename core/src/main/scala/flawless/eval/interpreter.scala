@@ -13,8 +13,6 @@ import flawless.data.Suite
 import flawless.NoEffect
 import cats.data.NonEmptyList
 import cats.mtl.MonadState
-import cats.effect.Sync
-import cats.effect.concurrent.Ref
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -22,14 +20,14 @@ trait Interpreter[F[_]] {
   /**
     * Interprets the test structure to the underlying effect. This is where all the actualy execution happens.
     */
-  def interpret: InterpretOne[Suite, F]
+  def interpret(reporter: Reporter[F]): InterpretOne[Suite, F]
 }
 
 object Interpreter {
   //A type alias for an action that interprets a single instance of Algebra (e.g. suite or test)
   type InterpretOne[Algebra[_[_]], F[_]] = Algebra[F] => F[Algebra[NoEffect]]
 
-  def defaultInterpreter[F[_]: Monad](mkReporter: F[Reporter[F]]): Interpreter[F] =
+  def defaultInterpreter[F[_]: Monad]: Interpreter[F] =
     new Interpreter[F] {
 
       private def interpretTest(reporter: Reporter[F]): InterpretOne[Test, F] = { test =>
@@ -58,24 +56,17 @@ object Interpreter {
 
       import Suite.algebra._
 
-      val interpret: InterpretOne[Suite, F] = {
-        def interpretInternal(reporter: Reporter[F]): InterpretOne[Suite, F] = {
-          case s: Sequence[f]  => s.traversal.traverse(s.suites)(interpret).map(Suite.sequence[f](_))
-          case o: One[f]       => interpretSuite(reporter)(o)
-          case s: Suspend[f]   => s.suite.flatMap(interpret)
-          case r: RResource[f] => r.resuite.use(interpret)(r.bracket)
-        }
-
-        suite => mkReporter.flatMap(interpretInternal(_)(suite))
+      def interpret(reporter: Reporter[F]): InterpretOne[Suite, F] = {
+        case s: Sequence[f]  => s.traversal.traverse(s.suites)(interpret(reporter)).map(Suite.sequence[f](_))
+        case o: One[f]       => interpretSuite(reporter)(o)
+        case s: Suspend[f]   => s.suite.flatMap(interpret(reporter))
+        case r: RResource[f] => r.resuite.use(interpret(reporter))(r.bracket)
       }
     }
 }
 
 @finalAlg
 trait Reporter[F[_]] {
-  // def reportTest: InterpretOne[Test, F] => InterpretOne[Test, F]
-  // def reportSuite: InterpretOne[Suite.algebra.One, F] => InterpretOne[Suite.algebra.One, F]
-
   def publish(event: Reporter.Event): F[Unit]
 }
 
@@ -89,24 +80,34 @@ object Reporter {
     final case class SuiteFinished(name: String) extends Event
   }
 
-  final case class SuiteCount(n: Int) extends AnyVal
-
-  object SuiteCount {
-    type MState[F[_]] = MonadState[F, SuiteCount]
-    def MState[F[_]](implicit F: MState[F]): MState[F] = F
-
-    def incBy[F[_]: MState](n: Int): F[Unit] = MState[F].modify(c => SuiteCount(c.n + n))
+  final case class SuiteHistory(cells: List[SuiteHistory.SuiteCell], currentSuite: Option[String]) {
+    def stringify: String = ???
   }
 
-  def mkConsoleInstance[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = Ref[F].of(SuiteCount(0)).map {
-    import com.olegpy.meow.effects._
+  object SuiteHistory {
+    final case class SuiteCell(status: Status)
+    sealed trait Status extends Product with Serializable
 
-    _.runState { implicit MS =>
-      consoleInstance[F]
+    object Status {
+      case object Pending extends Status
+      case object Running extends Status
+      case object Succeeded extends Status
+      case object Failed extends Status
+    }
+
+    val initial: SuiteHistory = SuiteHistory(Nil, None)
+
+    type MState[F[_]] = MonadState[F, SuiteHistory]
+    def MState[F[_]](implicit F: MState[F]): MState[F] = F
+
+    def addPending[F[_]: MState](count: Int): F[Unit] = {
+      val pendingCell = SuiteCell(Status.Pending)
+
+      MState[F].modify(c => c.copy(c.cells ++ List.fill(count)(pendingCell)))
     }
   }
 
-  def consoleInstance[F[_]: FlatMap: ConsoleOut: SuiteCount.MState]: Reporter[F] =
+  def consoleInstance[F[_]: FlatMap: ConsoleOut: SuiteHistory.MState]: Reporter[F] =
     new Reporter[F] {
       private def putStrWithDepth(depth: Int): String => F[Unit] = s => ConsoleOut[F].putStrLn(" " * depth * 2 + s)
 
@@ -120,4 +121,6 @@ object Reporter {
         case Event.SuiteFinished(name) => putSuite("Finished suite: " + name)
       }
     }
+
+  def visual[F[_]: FlatMap: ConsoleOut: SuiteHistory.MState]: Reporter[F] = ???
 }

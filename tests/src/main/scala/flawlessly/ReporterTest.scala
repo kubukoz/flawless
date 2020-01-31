@@ -6,7 +6,6 @@ import flawless.data.Suite
 import flawless.dsl._
 import flawless._
 import cats.implicits._
-import cats.effect.ConsoleOut
 import cats.data.Writer
 import cats.data.Chain
 import flawless.eval.Reporter
@@ -15,18 +14,12 @@ import cats.Show
 import cats.data.StateT
 
 object ReporterTest extends SuiteClass[NoEffect] {
-  type WC[A] = StateT[Writer[Chain[String], ?], Reporter.SuiteCount, A]
+  type WC[A] = StateT[Writer[Chain[Reporter.Event], ?], Reporter.SuiteHistory, A]
 
-  implicit val cout: ConsoleOut[WC] = new ConsoleOut[WC] {
-    def putStr[A: Show](a: A): WC[Unit] = StateT.liftF(Writer.tell(Chain(a.show)))
-    def putStrLn[A: Show](a: A): WC[Unit] = StateT.liftF(Writer.tell(Chain(show"$a\n")))
-  }
+  val reporter: Reporter[WC] = a => StateT.liftF(Writer.tell(Chain.one(a)))
+  val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
 
-  import cats.mtl.instances.all._
-
-  implicit val reporter: Reporter[WC] = Reporter.consoleInstance[WC]
-
-  val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC](reporter.pure[WC])
+  implicit val showEvent: Show[Reporter.Event] = Show.fromToString
 
   val runSuite: Suite[NoEffect] = suite("ReporterTest") {
     tests(
@@ -39,15 +32,21 @@ object ReporterTest extends SuiteClass[NoEffect] {
           )
         }
 
-        val expectedOut =
-          show"""Starting suite: suite 1
-                |  Starting test: test 1
-                |  Finished test: test 1
-                |  Starting test: test 2
-                |  Finished test: test 2
-                |Finished suite: suite 1""".stripMargin.linesIterator.toList.map(_ + "\n")
+        import Reporter.Event._
 
-        ensureEqual(interpreter.interpret(testedSuite).runA(Reporter.SuiteCount(0)).written.toList, expectedOut)
+        val expectedOut = List(
+          SuiteStarted("suite 1"),
+          TestStarted("test 1"),
+          TestFinished("test 1"),
+          TestStarted("test 2"),
+          TestFinished("test 2"),
+          SuiteFinished("suite 1")
+        )
+
+        ensureEqual(
+          interpreter.interpret(reporter)(testedSuite).runA(Reporter.SuiteHistory(0)).written.toList,
+          expectedOut
+        )
       }
     )
   }

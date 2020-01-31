@@ -75,8 +75,10 @@ package object eval {
       ConsoleOut[F].putStrLn(msg).as(exit)
   }
 
-  def loadArgs[F[_]: Applicative](args: List[String]): F[Unit] = {
+  def loadArgs[F[_]: Applicative](args: List[String]): F[Settings] = {
     val _ = args
-    Applicative[F].unit
+    //todo actually read the args
+    Settings(visual = true).pure[F]
+    // Settings(visual = args.contains("visual")).pure[F]
   }
 }
