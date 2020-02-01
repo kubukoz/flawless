@@ -31,13 +31,19 @@ package object flawless {
 
   def runTests[F[_]: Interpreter: ConsoleOut: Sync](args: List[String])(suites: Suite[F]): F[ExitCode] =
     loadArgs[F](args).flatMap { args =>
-      Ref[F].of(Reporter.SuiteHistory.initial).flatMap { ref =>
-        import com.olegpy.meow.effects._
-        val reporter = ref.runState { implicit MS =>
-          if (args.visual) Reporter.visual[F] else Reporter.consoleInstance[F]
-        }
+      Ref[F]
+        .of(Reporter.SuiteHistory.initial)
+        .map {
+          import com.olegpy.meow.effects._
 
-        Interpreter[F].interpret(reporter)(suites).flatMap(summarize[F])
-      }
+          _.runState { implicit MS =>
+            if (args.visual)
+              Reporter.visual[F]
+            else
+              Reporter.consoleInstance[F]
+          }
+        }
+        .flatMap(Interpreter[F].interpret(_)(suites))
+        .flatMap(summarize[F](_))
     }
 }
