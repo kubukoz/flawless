@@ -14,13 +14,11 @@ import cats.effect.Bracket
 import cats.Functor
 import cats.FlatMap
 
-import flawless.NoEffect
 import cats.kernel.Semigroup
 import cats.kernel.Monoid
 import flawless.data.Assertion.Result
 import flawless.data.Assertion.One
 import flawless.data.Assertion.All
-import flawless.eval.Interpreter
 
 sealed trait Assertion extends Product with Serializable {
 

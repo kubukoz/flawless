@@ -20,7 +20,7 @@ object FlawlessTests extends IOApp with TestApp {
 
       Suite.sequential(
         GetStatsTest.runSuite,
-        ReporterTest.runSuite,
+        new InterpreterReportingTest[IO].runSuite,
         tagless,
         new TaglessTestLocalResource[IO].runSuite
       )

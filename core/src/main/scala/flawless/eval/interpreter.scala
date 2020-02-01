@@ -18,7 +18,7 @@ import cats.mtl.MonadState
 trait Interpreter[F[_]] {
 
   /**
-    * Interprets the test structure to the underlying effect. This is where all the actualy execution happens.
+    * Interprets the test structure to the underlying effect. This is where all the actual execution happens.
     */
   def interpret(reporter: Reporter[F]): InterpretOne[Suite, F]
 }
@@ -30,7 +30,10 @@ object Interpreter {
   def defaultInterpreter[F[_]: Monad]: Interpreter[F] =
     new Interpreter[F] {
 
-      private def interpretTest(reporter: Reporter[F]): InterpretOne[Test, F] = { test =>
+      private def report(event: Reporter.Event.type => Reporter.Event)(implicit reporter: Reporter[F]): F[Unit] =
+        reporter.publish(event(Reporter.Event))
+
+      private def interpretTest(implicit reporter: Reporter[F]): InterpretOne[Test, F] = { test =>
         def finish(results: Assertion): Test[NoEffect] = Test(test.name, TestRun.Pure(results))
 
         val exec: F[Test[NoEffect]] = test.result match {
@@ -40,24 +43,27 @@ object Interpreter {
           case TestRun.Lazy(e)       => e.map(finish).value.pure[F]
         }
 
-        reporter.publish(Reporter.Event.TestStarted(test.name)) *>
+        report(_.TestStarted(test.name)) *>
           exec <*
-          reporter.publish(Reporter.Event.TestFinished(test.name))
+          report(_.TestFinished(test.name))
       }
 
-      private def interpretSuite(reporter: Reporter[F]): InterpretOne[Suite.algebra.One, F] = { suite =>
+      private def interpretSuite(implicit reporter: Reporter[F]): InterpretOne[Suite.algebra.One, F] = { suite =>
         def finish(results: NonEmptyList[Test[NoEffect]]): Suite.algebra.One[NoEffect] =
           Suite.algebra.One(suite.name, results)
 
-        reporter.publish(Reporter.Event.SuiteStarted(suite.name)) *>
+        report(_.SuiteStarted(suite.name)) *>
           suite.tests.nonEmptyTraverse(interpretTest(reporter)).map(finish) <*
-          reporter.publish(Reporter.Event.SuiteFinished(suite.name))
+          report(_.SuiteFinished(suite.name))
       }
 
       import Suite.algebra._
 
       def interpret(reporter: Reporter[F]): InterpretOne[Suite, F] = {
-        case s: Sequence[f]  => s.traversal.traverse(s.suites)(interpret(reporter)).map(Suite.sequence[f](_))
+        case s: Sequence[f] =>
+          //Always reporting size-1, because the "current" suite has already been reported
+          (report(_.ExtraSuitesReported(s.suites.size - 1))(reporter): f[Unit]) *>
+            s.traversal.traverse(s.suites)(interpret(reporter)).map(Suite.sequence[f](_))
         case o: One[f]       => interpretSuite(reporter)(o)
         case s: Suspend[f]   => s.suite.flatMap(interpret(reporter))
         case r: RResource[f] => r.resuite.use(interpret(reporter))(r.bracket)
@@ -78,6 +84,7 @@ object Reporter {
     final case class TestFinished(name: String) extends Event
     final case class SuiteStarted(name: String) extends Event
     final case class SuiteFinished(name: String) extends Event
+    final case class ExtraSuitesReported(amount: Int) extends Event
   }
 
   final case class SuiteHistory(cells: List[SuiteHistory.SuiteCell], currentSuite: Option[String]) {
@@ -95,7 +102,7 @@ object Reporter {
       case object Failed extends Status
     }
 
-    val initial: SuiteHistory = SuiteHistory(Nil, None)
+    val initial: SuiteHistory = SuiteHistory(List(SuiteHistory.SuiteCell(Status.Pending)), None)
 
     type MState[F[_]] = MonadState[F, SuiteHistory]
     def MState[F[_]](implicit F: MState[F]): MState[F] = F
@@ -115,10 +122,11 @@ object Reporter {
       private val putTest = putStrWithDepth(1)
 
       def publish(event: Event): F[Unit] = event match {
-        case Event.TestStarted(name)   => putTest("Starting test: " + name)
-        case Event.TestFinished(name)  => putTest("Finished test: " + name)
-        case Event.SuiteStarted(name)  => putSuite("Starting suite: " + name)
-        case Event.SuiteFinished(name) => putSuite("Finished suite: " + name)
+        case Event.TestStarted(name)           => putTest(show"Starting test: $name")
+        case Event.TestFinished(name)          => putTest(show"Finished test: $name")
+        case Event.SuiteStarted(name)          => putSuite(show"Starting suite: $name")
+        case Event.SuiteFinished(name)         => putSuite(show"Finished suite: $name")
+        case Event.ExtraSuitesReported(amount) => putSuite(show"Discovered $amount suites")
       }
     }
 
