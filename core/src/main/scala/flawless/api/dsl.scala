@@ -9,7 +9,7 @@ import com.softwaremill.diffx.Diff
 import cats.Show
 import cats.Eval
 import flawless.Predicate
-import cats.Functor
+import cats.kernel.Eq
 
 trait AllDsl {
 
@@ -43,8 +43,13 @@ trait AllDsl {
 
   def ensure[A](value: A, predicate: Predicate[A]): Assertion = predicate(value)
 
+  //todo naming
+  def ensureEqualEq[A: Eq: Show](actual: A, expected: A): Assertion =
+    if (actual === expected) Assertion.successful
+    else Assertion.failed(show"$actual (actual) wasn't equal to $expected (expected).")
+
   def ensureEqual[A: Diff: Show](actual: A, expected: A): Assertion =
-    ensure(actual, flawless.predicates.equalTo(expected))
+    flawless.predicates.equalTo(expected).apply(actual)
 
   def assertion(cond: Boolean, ifFalse: String): Assertion = ensure(cond, flawless.predicates.isTrue(ifFalse))
 }

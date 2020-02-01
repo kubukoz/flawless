@@ -16,12 +16,23 @@ import cats.effect.Sync
 import cats.effect.Bracket
 import cats.Foldable
 import flawless.data.Assertion
+import flawless.eval.UniqueFactory
+import cats.effect.SyncIO
+import flawless.eval.unique
+import cats.Applicative
 
 //Sync, because Bracket for WriterT isn't explicitly written
 final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
   type WC[A] = WriterT[F, Chain[Reporter.Event], A]
 
   implicit val bracketWriter: Bracket[WC, Throwable] = Sync.catsWriterTSync
+
+  //let's be serious
+  val id = UniqueFactory[SyncIO].get.unsafeRunSync()
+
+  implicit val uniqueFactory: UniqueFactory[WC] = new UniqueFactory[WC] {
+    val get: WC[unique.Unique] = Applicative[WC].pure(id)
+  }
 
   val reporter: Reporter[WC] = a => WriterT.tell(a.pure[Chain])
   val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
@@ -38,18 +49,18 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
   import Reporter.Event._
 
   val simpleEvents = List(
-    SuiteStarted("suite 1"),
+    SuiteStarted("suite 1", id),
     TestStarted("test 1"),
     TestFinished("test 1"),
     TestStarted("test 2"),
     TestFinished("test 2"),
-    SuiteFinished("suite 1")
+    SuiteFinished("suite 1", id)
   )
 
   def simpleResource(suite: Suite[WC]): Suite[WC] = Suite.resource(suite.pure[Resource[WC, *]])
 
   def ensureReported[G[_]: Foldable](suite: Suite[WC])(expectedWritten: G[Reporter.Event]): F[Assertion] =
-    interpreter.interpret(reporter)(suite).written.map(_.toList).map(ensureEqual(_, expectedWritten.toList))
+    interpreter.interpret(reporter)(suite).written.map(_.toList).map(ensureEqualEq(_, expectedWritten.toList))
 
   //todo: these would be good property tests
   val runSuite: Suite[F] = suite(getClass.getSimpleName) {

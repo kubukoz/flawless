@@ -13,6 +13,8 @@ import flawless.data.Suite
 import flawless.NoEffect
 import cats.data.NonEmptyList
 import cats.mtl.MonadState
+import flawless.eval.unique.Unique
+import cats.kernel.Eq
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -27,7 +29,7 @@ object Interpreter {
   //A type alias for an action that interprets a single instance of Algebra (e.g. suite or test)
   type InterpretOne[Algebra[_[_]], F[_]] = Algebra[F] => F[Algebra[NoEffect]]
 
-  def defaultInterpreter[F[_]: Monad]: Interpreter[F] =
+  def defaultInterpreter[F[_]: Monad: UniqueFactory]: Interpreter[F] =
     new Interpreter[F] {
 
       private def report(event: Reporter.Event.type => Reporter.Event)(implicit reporter: Reporter[F]): F[Unit] =
@@ -52,9 +54,11 @@ object Interpreter {
         def finish(results: NonEmptyList[Test[NoEffect]]): Suite.algebra.One[NoEffect] =
           Suite.algebra.One(suite.name, results)
 
-        report(_.SuiteStarted(suite.name)) *>
-          suite.tests.nonEmptyTraverse(interpretTest(reporter)).map(finish) <*
-          report(_.SuiteFinished(suite.name))
+        UniqueFactory[F].get.flatMap { id =>
+          report(_.SuiteStarted(suite.name, id)) *>
+            suite.tests.nonEmptyTraverse(interpretTest(reporter)).map(finish) <*
+            report(_.SuiteFinished(suite.name, id))
+        }
       }
 
       import Suite.algebra._
@@ -82,9 +86,11 @@ object Reporter {
   object Event {
     final case class TestStarted(name: String) extends Event
     final case class TestFinished(name: String) extends Event
-    final case class SuiteStarted(name: String) extends Event
-    final case class SuiteFinished(name: String) extends Event
+    final case class SuiteStarted(name: String, id: Unique) extends Event
+    final case class SuiteFinished(name: String, id: Unique) extends Event
     final case class ExtraSuitesReported(amount: Int) extends Event
+
+    implicit val eq: Eq[Event] = Eq.fromUniversalEquals
   }
 
   final case class SuiteHistory(cells: NonEmptyList[SuiteHistory.SuiteCell], currentSuite: Option[String]) {
@@ -124,11 +130,20 @@ object Reporter {
       def publish(event: Event): F[Unit] = event match {
         case Event.TestStarted(name)           => putTest(show"Starting test: $name")
         case Event.TestFinished(name)          => putTest(show"Finished test: $name")
-        case Event.SuiteStarted(name)          => putSuite(show"Starting suite: $name")
-        case Event.SuiteFinished(name)         => putSuite(show"Finished suite: $name")
+        case Event.SuiteStarted(name, id)      => putSuite(show"Starting suite: $name with id $id")
+        case Event.SuiteFinished(name, id)     => putSuite(show"Finished suite: $name with id $id")
         case Event.ExtraSuitesReported(amount) => putSuite(show"Discovered $amount suites")
       }
     }
 
-  def visual[F[_]: FlatMap: ConsoleOut: SuiteHistory.MState]: Reporter[F] = ???
+  def visual[F[_]: Monad: ConsoleOut: SuiteHistory.MState]: Reporter[F] = new Reporter[F] {
+
+    def publish(event: Event): F[Unit] = event match {
+      //yeah!
+      case Event.SuiteStarted(_, _)     => Monad[F].unit
+      case Event.SuiteFinished(_, _)    => Monad[F].unit
+      case Event.ExtraSuitesReported(_) => Monad[F].unit
+      case _                            => Monad[F].unit
+    }
+  }
 }
