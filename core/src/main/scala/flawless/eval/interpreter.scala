@@ -87,7 +87,7 @@ object Reporter {
     final case class ExtraSuitesReported(amount: Int) extends Event
   }
 
-  final case class SuiteHistory(cells: List[SuiteHistory.SuiteCell], currentSuite: Option[String]) {
+  final case class SuiteHistory(cells: NonEmptyList[SuiteHistory.SuiteCell], currentSuite: Option[String]) {
     def stringify: String = ???
   }
 
@@ -102,7 +102,7 @@ object Reporter {
       case object Failed extends Status
     }
 
-    val initial: SuiteHistory = SuiteHistory(List(SuiteHistory.SuiteCell(Status.Pending)), None)
+    val initial: SuiteHistory = SuiteHistory(NonEmptyList.one(SuiteHistory.SuiteCell(Status.Pending)), None)
 
     type MState[F[_]] = MonadState[F, SuiteHistory]
     def MState[F[_]](implicit F: MState[F]): MState[F] = F
