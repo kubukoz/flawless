@@ -9,6 +9,7 @@ import com.softwaremill.diffx.Diff
 import cats.Show
 import cats.Eval
 import flawless.Predicate
+import cats.Functor
 
 trait AllDsl {
 

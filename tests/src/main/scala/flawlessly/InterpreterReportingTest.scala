@@ -10,23 +10,23 @@ import cats.data.Chain
 import flawless.eval.Reporter
 import flawless.eval.Interpreter
 import cats.Show
-import cats.data.StateT
 import cats.data.WriterT
 import cats.effect.Resource
 import cats.effect.Sync
 import cats.effect.Bracket
 import cats.Foldable
 import flawless.data.Assertion
+import cats.data.Kleisli
+import cats.effect.concurrent.Ref
 
 //Sync, because Bracket for WriterT isn't explicitly written
 final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
   type WT[A] = WriterT[F, Chain[Reporter.Event], A]
-  type WC[A] = StateT[WriterT[F, Chain[Reporter.Event], ?], Reporter.SuiteHistory, A]
+  type WC[A] = Kleisli[WriterT[F, Chain[Reporter.Event], ?], Ref[F, Reporter.SuiteHistory], A]
 
   implicit val bracketWriter: Bracket[WT, Throwable] = Sync.catsWriterTSync
-  implicit val bracketWC: Bracket[WC, Throwable] = Sync.catsStateTSync
 
-  val reporter: Reporter[WC] = a => StateT.liftF(WriterT.tell(a.pure[Chain]))
+  val reporter: Reporter[WC] = a => Kleisli.liftF(WriterT.tell(a.pure[Chain]))
   val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
 
   implicit val showEvent: Show[Reporter.Event] = Show.fromToString
@@ -52,10 +52,9 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
   def simpleResource(suite: Suite[WC]): Suite[WC] = Suite.resource(suite.pure[Resource[WC, *]])
 
   def ensureReported[G[_]: Foldable](suite: Suite[WC])(expectedWritten: G[Reporter.Event]): F[Assertion] =
-    interpreter
-      .interpret(reporter)(suite)
-      .runA(Reporter.SuiteHistory.initial)
-      .written
+    Ref[F]
+      .of(Reporter.SuiteHistory.initial)
+      .flatMap(interpreter.interpret(reporter)(suite).run(_).written)
       .map(_.toList)
       .map(ensureEqual(_, expectedWritten.toList))
 
