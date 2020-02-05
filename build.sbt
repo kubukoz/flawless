@@ -29,7 +29,7 @@ val commonSettings = Seq(
     "com.github.julien-truffaut" %% "monocle" % "2.0.1",
     "org.typelevel" %% "cats-effect" % "2.1.0",
     "dev.profunktor" %% "console4cats" % "0.8.1",
-    "com.softwaremill.diffx" %% "diffx-core" % "0.3.16"
+    "com.softwaremill.diffx" %% "diffx-core" % "0.3.17"
   ) ++ compilerPlugins
 )
 
