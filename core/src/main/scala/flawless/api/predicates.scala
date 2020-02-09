@@ -19,7 +19,8 @@ trait AllPredicates {
     a =>
       Diff[T].apply(a, another) match {
         case diff if diff.isIdentical => Assertion.successful
-        case diff                     => Assertion.failed(show"$a (actual) was not equal to $another (expected). Diff: $diff")
+        case diff =>
+          Assertion.failed(show"$a (actual) was not equal to $another (expected). Diff: ${Console.RESET}$diff")
       }
   }
 

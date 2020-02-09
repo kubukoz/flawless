@@ -22,7 +22,8 @@ object FlawlessTests extends IOApp with TestApp {
         GetStatsTest.runSuite,
         new InterpreterReportingTest[IO].runSuite,
         tagless,
-        new TaglessTestLocalResource[IO].runSuite
+        new TaglessTestLocalResource[IO].runSuite,
+        HistoryStringifyTests.runSuite
       )
     }
 }
