@@ -18,7 +18,7 @@ object FlawlessTests extends IOApp with TestApp {
         }
       }
 
-      Suite.sequential(
+      Suite.parallel(
         GetStatsTest.runSuite,
         new InterpreterReportingTest[IO].runSuite,
         tagless,

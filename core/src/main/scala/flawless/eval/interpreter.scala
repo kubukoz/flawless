@@ -14,9 +14,10 @@ import cats.data.NonEmptyList
 import cats.mtl.MonadState
 import flawless.eval.unique.Unique
 import cats.kernel.Eq
-import cats.Functor
 import cats.effect.Sync
 import cats.Applicative
+import cats.effect.concurrent.Ref
+import cats.FlatMap
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -109,7 +110,7 @@ object Reporter {
     implicit def eq[Identifier]: Eq[Event[Identifier]] = Eq.fromUniversalEquals
   }
 
-  final case class SuiteHistory(cells: /* NonEmpty */ List[SuiteHistory.Cell]) {
+  final case class SuiteHistory(cells: List[SuiteHistory.Cell]) {
     def stringify: String = ???
   }
 
@@ -159,20 +160,21 @@ object Reporter {
         )
       }
 
-    def show[F[_]: MState: Functor]: F[Unit] = MState[F].get.map(a => println(a)) //psst...
+    def show[F[_]: MState: FlatMap: ConsoleOut]: F[Unit] =
+      MState[F].get.map(_.toString).flatMap(ConsoleOut[F].putStrLn(_))
   }
 
-  def consoleInstance[F[_]: Sync: ConsoleOut: SuiteHistory.MState]: Reporter[F] =
+  def consoleInstance[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = Ref[F].of(0).map { identifiers =>
     new Reporter[F] {
-      type Identifier = Unique
-      val ident: F[Unique] = Sync[F].delay(new Unique)
+      type Identifier = Int
+      val ident: F[Identifier] = identifiers.modify(a => (a + 1, a))
 
       private def putStrWithDepth(depth: Int): String => F[Unit] = s => ConsoleOut[F].putStrLn(" " * depth * 2 + s)
 
       private val putSuite = putStrWithDepth(0)
       private val putTest = putStrWithDepth(1)
 
-      def publish(event: Event[Unique]): F[Unit] = event match {
+      def publish(event: Event[Identifier]): F[Unit] = event match {
         case Event.TestStarted(name)                     => putTest(show"Starting test: $name")
         case Event.TestFinished(name)                    => putTest(show"Finished test: $name")
         case Event.SuiteStarted(name, id)                => putSuite(show"Starting suite: $name with id $id")
@@ -180,20 +182,28 @@ object Reporter {
         case Event.ReplaceSuiteWith(toRemove, toReplace) => putSuite(show"Replacing suite $toRemove with $toReplace")
       }
     }
+  }
 
-  def visual[F[_]: Sync: ConsoleOut: SuiteHistory.MState]: Reporter[F] = new Reporter[F] {
-    type Identifier = Unique
-    val ident: F[Unique] = Sync[F].delay(new Unique)
+  import com.olegpy.meow.effects._
 
-    def publish(event: Event[Identifier]): F[Unit] = event match {
-      case Event.SuiteStarted(_, id)  => SuiteHistory.markRunning(id)
-      case Event.SuiteFinished(_, id) => SuiteHistory.markFinished(id)
-      case Event.ReplaceSuiteWith(toRemove, toReplace) =>
-        val newCells: NonEmptyList[SuiteHistory.Cell] =
-          toReplace.map(SuiteHistory.Status.Pending(_)).map(SuiteHistory.Cell(_))
-        SuiteHistory.replace(toRemove, newCells)
+  def visual[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = Ref[F].of(SuiteHistory.initial).map(_.stateInstance).map {
+    implicit S =>
+      new Reporter[F] {
+        type Identifier = Unique
+        val ident: F[Unique] = Sync[F].delay(new Unique)
 
-      case _ => Applicative[F].unit
-    }
+        def publish(event: Event[Identifier]): F[Unit] = {
+          event match {
+            case Event.SuiteStarted(_, id)  => SuiteHistory.markRunning(id)
+            case Event.SuiteFinished(_, id) => SuiteHistory.markFinished(id)
+            case Event.ReplaceSuiteWith(toRemove, toReplace) =>
+              val newCells: NonEmptyList[SuiteHistory.Cell] =
+                toReplace.map(SuiteHistory.Status.Pending(_)).map(SuiteHistory.Cell(_))
+              SuiteHistory.replace(toRemove, newCells)
+
+            case _ => Applicative[F].unit
+          }
+        } *> SuiteHistory.show
+      }
   }
 }

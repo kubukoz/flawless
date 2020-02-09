@@ -8,8 +8,6 @@ import flawless.eval.loadArgs
 
 package object flawless {
 
-  import cats.effect.concurrent.Ref
-
   import cats.effect.Sync
 
   import flawless.eval.Reporter
@@ -30,20 +28,11 @@ package object flawless {
   object predicates extends api.AllPredicates
 
   def runTests[F[_]: Interpreter: ConsoleOut: Sync](args: List[String])(suites: Suite[F]): F[ExitCode] =
-    loadArgs[F](args).flatMap { args =>
-      Ref[F]
-        .of(Reporter.SuiteHistory.initial)
-        .map {
-          import com.olegpy.meow.effects._
-
-          _.runState { implicit MS =>
-            if (args.visual)
-              Reporter.visual[F]
-            else
-              Reporter.consoleInstance[F]
-          }
-        }
-        .flatMap(Interpreter[F].interpret(_)(suites))
-        .flatMap(summarize[F](_))
-    }
+    loadArgs[F](args)
+      .flatMap {
+        case args if args.visual => Reporter.visual[F]
+        case _                   => Reporter.consoleInstance[F]
+      }
+      .flatMap(Interpreter[F].interpret(_)(suites))
+      .flatMap(summarize[F](_))
 }
