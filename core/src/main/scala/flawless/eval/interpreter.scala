@@ -61,8 +61,13 @@ object Interpreter {
             Suite.algebra.One(suite.name, results)
 
           reporter.publish(Reporter.Event.SuiteStarted(suite.name, id)) *>
-            suite.tests.nonEmptyTraverse(interpretTest(reporter).apply(_)).map(finish) <*
-            reporter.publish(Reporter.Event.SuiteFinished(suite.name, id))
+            suite.tests.nonEmptyTraverse(interpretTest(reporter).apply(_)).map(finish).flatTap { suiteResult =>
+              //todo duplicated logic!!!!
+              val isSuccessful =
+                suiteResult.tests.map(_.result.assertions[cats.Id]).flatMap(_.results).forall(_.isSuccessful)
+
+              reporter.publish(Reporter.Event.SuiteFinished(suite.name, id, isSuccessful))
+            }
       }
 
       import Suite.algebra._
@@ -107,7 +112,9 @@ object Reporter {
     final case class TestStarted[Identifier](name: String) extends Event[Identifier]
     final case class TestFinished[Identifier](name: String) extends Event[Identifier]
     final case class SuiteStarted[Identifier](name: String, id: Identifier) extends Event[Identifier]
-    final case class SuiteFinished[Identifier](name: String, id: Identifier) extends Event[Identifier]
+
+    final case class SuiteFinished[Identifier](name: String, id: Identifier, succeeded: Boolean)
+      extends Event[Identifier]
 
     final case class ReplaceSuiteWith[Identifier](replace: Identifier, withSuites: NonEmptyList[Identifier])
       extends Event[Identifier]
@@ -175,9 +182,10 @@ object Reporter {
       case cell                                    => cell.status
     }
 
-    def markFinished[F[_]: MState](id: Unique): F[Unit] = updateStatus[F] {
-      case Cell(`id`, SuiteHistory.Status.Running) => SuiteHistory.Status.Succeeded
-      case cell                                    => cell.status
+    def markFinished[F[_]: MState](id: Unique, succ: Boolean): F[Unit] = updateStatus[F] {
+      case Cell(`id`, SuiteHistory.Status.Running) =>
+        if (succ) SuiteHistory.Status.Succeeded else SuiteHistory.Status.Failed
+      case cell => cell.status
     }
 
     //sub-optimal map, could stop early
@@ -192,7 +200,13 @@ object Reporter {
       }
 
     def show[F[_]: MState: FlatMap: ConsoleOut]: F[Unit] =
-      MState[F].get.map(_.toString).flatMap(ConsoleOut[F].putStrLn(_))
+      MState[F].get.flatMap { result =>
+        val clear = "\033[2J\033[H"
+
+        if (result.cells.map(_.status).contains_(Status.Pending))
+          ConsoleOut[F].putStrLn(clear ++ result.stringify)
+        else ConsoleOut[F].putStrLn(clear ++ "Finished")
+      }
   }
 
   def consoleInstance[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = Ref[F].of(0).map { identifiers =>
@@ -206,10 +220,11 @@ object Reporter {
       private val putTest = putStrWithDepth(1)
 
       def publish(event: Event[Identifier]): F[Unit] = event match {
-        case Event.TestStarted(name)                     => putTest(show"Starting test: $name")
-        case Event.TestFinished(name)                    => putTest(show"Finished test: $name")
-        case Event.SuiteStarted(name, id)                => putSuite(show"Starting suite: $name with id $id")
-        case Event.SuiteFinished(name, id)               => putSuite(show"Finished suite: $name with id $id")
+        case Event.TestStarted(name)      => putTest(show"Starting test: $name")
+        case Event.TestFinished(name)     => putTest(show"Finished test: $name")
+        case Event.SuiteStarted(name, id) => putSuite(show"Starting suite: $name with id $id")
+        case Event.SuiteFinished(name, id, succ) =>
+          putSuite(show"Finished suite: $name with id $id. Succeeded? $succ")
         case Event.ReplaceSuiteWith(toRemove, toReplace) => putSuite(show"Replacing suite $toRemove with $toReplace")
       }
     }
@@ -217,16 +232,16 @@ object Reporter {
 
   import com.olegpy.meow.effects._
 
-  def visual[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = Ref[F].of(SuiteHistory.initial).map(_.stateInstance).map {
-    implicit S =>
+  def visual[F[_]: Sync: ConsoleOut]: F[Reporter[F]] =
+    Ref[F].of(SuiteHistory.initial).map(_.stateInstance).map { implicit S =>
       new Reporter[F] {
         type Identifier = Unique
         val ident: F[Unique] = Sync[F].delay(new Unique)
 
-        def publish(event: Event[Identifier]): F[Unit] =
+        def publish(event: Event[Identifier]): F[Unit] = {
           event match {
-            case Event.SuiteStarted(_, id)  => SuiteHistory.markRunning(id)
-            case Event.SuiteFinished(_, id) => SuiteHistory.markFinished(id)
+            case Event.SuiteStarted(_, id)        => SuiteHistory.markRunning(id)
+            case Event.SuiteFinished(_, id, succ) => SuiteHistory.markFinished(id, succ)
             case Event.ReplaceSuiteWith(toRemove, toReplace) =>
               val newCells: NonEmptyList[SuiteHistory.Cell] =
                 toReplace.tupleRight(SuiteHistory.Status.Pending).map(SuiteHistory.Cell.tupled)
@@ -234,7 +249,7 @@ object Reporter {
 
             case _ => Applicative[F].unit
           }
-        // *> SuiteHistory.show
+        } *> SuiteHistory.show
       }
-  }
+    }
 }

@@ -56,7 +56,7 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
     TestFinished("test 1"),
     TestStarted("test 2"),
     TestFinished("test 2"),
-    SuiteFinished("suite 1", id)
+    SuiteFinished("suite 1", id, succeeded = true)
   )
 
   def simpleResource(suite: Suite[WC]): Suite[WC] = Suite.resource(suite.pure[Resource[WC, *]])
