@@ -18,6 +18,8 @@ import cats.effect.Sync
 import cats.Applicative
 import cats.effect.concurrent.Ref
 import cats.FlatMap
+import cats.MonadError
+import scala.util.control.NonFatal
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -32,7 +34,7 @@ object Interpreter {
   //A type alias for an action that interprets a single instance of Algebra (e.g. suite or test)
   type InterpretOne[Algebra[_[_]], F[_]] = Algebra[F] => F[Algebra[NoEffect]]
 
-  def defaultInterpreter[F[_]: Monad]: Interpreter[F] =
+  def defaultInterpreter[F[_]: MonadError[*[_], Throwable]]: Interpreter[F] =
     new Interpreter[F] {
 
       private def interpretTest(implicit reporter: Reporter[F]): InterpretOne[Test, F] = { test =>
@@ -40,9 +42,13 @@ object Interpreter {
 
         val exec: F[Test[NoEffect]] = test.result match {
           //this is a GADT skolem - you think I'd know what that means by now...
-          case eval: TestRun.Eval[f] => eval.effect.map(finish)
+          case eval: TestRun.Eval[f] => eval.effect.handleError(Assertion.thrown(_)).map(finish)
           case TestRun.Pure(result)  => finish(result).pure[F]
-          case TestRun.Lazy(e)       => e.map(finish).value.pure[F]
+          case TestRun.Lazy(e) =>
+            finish {
+              try e.value
+              catch { case NonFatal(e) => (Assertion.thrown(e)) }
+            }.pure[F]
         }
 
         reporter.publish(Reporter.Event.TestStarted(test.name)) *>
@@ -56,7 +62,7 @@ object Interpreter {
             Suite.algebra.One(suite.name, results)
 
           reporter.publish(Reporter.Event.SuiteStarted(suite.name, id)) *>
-            suite.tests.nonEmptyTraverse(interpretTest(reporter)).map(finish) <*
+            suite.tests.nonEmptyTraverse(interpretTest(reporter).apply(_)).map(finish) <*
             reporter.publish(Reporter.Event.SuiteFinished(suite.name, id))
       }
 
@@ -192,7 +198,7 @@ object Reporter {
         type Identifier = Unique
         val ident: F[Unique] = Sync[F].delay(new Unique)
 
-        def publish(event: Event[Identifier]): F[Unit] = {
+        def publish(event: Event[Identifier]): F[Unit] =
           event match {
             case Event.SuiteStarted(_, id)  => SuiteHistory.markRunning(id)
             case Event.SuiteFinished(_, id) => SuiteHistory.markFinished(id)
@@ -203,7 +209,7 @@ object Reporter {
 
             case _ => Applicative[F].unit
           }
-        } *> SuiteHistory.show
+        // *> SuiteHistory.show
       }
   }
 }

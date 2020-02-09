@@ -10,6 +10,8 @@ import flawless.data.Test
 
 package object eval {
 
+  import flawless.data.Assertion
+
   import cats.Applicative
 
   def summarize[F[_]: ConsoleOut: FlatMap](suites: Suite[Id]): F[ExitCode] = {

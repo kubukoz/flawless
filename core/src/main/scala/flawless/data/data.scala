@@ -19,18 +19,35 @@ import cats.kernel.Monoid
 import flawless.data.Assertion.Result
 import flawless.data.Assertion.One
 import flawless.data.Assertion.All
+import scala.annotation.tailrec
 
 sealed trait Assertion extends Product with Serializable {
 
-  def results: NonEmptyList[Result] = this match {
-    case One(result)     => NonEmptyList.one(result)
-    case All(assertions) => assertions.flatMap(_.results)
+  def results: NonEmptyList[Result] = {
+    // Manual recursion instead of trampolining, to save some space on lambdas
+    @tailrec
+    def go(remaining: List[Assertion], results: List[Result]): List[Result] = remaining match {
+      case One(result) :: t     => go(t, result :: results)
+      case All(assertions) :: t => go(assertions.toList ::: t, results)
+      case Nil                  => results.reverse
+    }
+
+    // This is really safe, okay?
+    // Nil could only ever be returned if no assertions were provided, and we start with `this`, so there's always one.
+    // If this ever throws - there's a bug in flawless.
+    NonEmptyList.fromListUnsafe(go(List(this), Nil))
   }
 }
 
 object Assertion {
   val successful: Assertion = one(Result.Successful)
   def failed(message: String): Assertion = one(Result.Failed(message))
+
+  def thrown(e: Throwable): Assertion =
+    failed(
+      show"An unexpected ${e.getClass().getName()} was thrown: ${e
+        .getMessage()}\n${e.getStackTrace().map(_.toString).map("  at " + _).mkString("\n")}"
+    )
 
   def one(result: Result): Assertion = One(result)
 
@@ -53,7 +70,7 @@ object Assertion {
   implicit val assertionMonoid: Monoid[Assertion] = new Monoid[Assertion] {
     //todo optimize for nested sequences
     def combine(x: Assertion, y: Assertion): Assertion = All(NonEmptyList.of(x, y))
-    def empty: Assertion = successful
+    val empty: Assertion = successful
   }
 }
 
@@ -149,6 +166,9 @@ object Suite {
 
   def suspend[F[_]](suites: F[Suite[F]]): Suite[F] = algebra.Suspend(suites)
 
+  def thrown(e: Throwable): Suite.algebra.One[flawless.NoEffect] =
+    algebra.One("failed", NonEmptyList.one(Test.thrown(e)))
+
   /**
     * Semigroup instance that combines suites sequentially.
     */
@@ -188,6 +208,10 @@ object Suite {
 
 //todo rename result to run
 final case class Test[+F[_]](name: String, result: TestRun[F])
+
+object Test {
+  def thrown(e: Throwable): Test[flawless.NoEffect] = Test("failed", TestRun.Pure(Assertion.thrown(e)))
+}
 
 sealed trait TestRun[+F[_]] extends Product with Serializable {
 

@@ -54,7 +54,7 @@ object ExampleTests extends IOApp with TestApp {
         FlakySuite.runSuite,
         ExpensiveSuite.runSuite.parCombineN[IO](10),
         Suite.parSequence(parallelTests.map(_.runSuite)),
-        Suite.parSequence(sequentialTests.map(_.runSuite)),
+        Suite.sequence(sequentialTests.map(_.runSuite)),
         dbTests
       )
     )
