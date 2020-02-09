@@ -1,7 +1,6 @@
 package flawless.eval
 
 import cats.implicits._
-import cats.Monad
 import flawless.data.Test
 import flawless.data.Assertion
 import flawless.data.TestRun
@@ -117,18 +116,44 @@ object Reporter {
   }
 
   final case class SuiteHistory(cells: List[SuiteHistory.Cell]) {
-    def stringify: String = ???
+
+    //reference implementation, will be overridden for more performance (and possibly no fs2 dependency)
+    def stringify: String = {
+      fs2.Stream.emit(Console.RESET) ++
+        fs2.Stream.emits(cells).groupAdjacentBy(_.status).map(_.map(_.size)).map {
+          case (status, cellCount) => status.color ++ status.stringify.combineN(cellCount)
+        } ++
+        fs2.Stream.emit(Console.RESET)
+    }.compile.string
   }
 
   object SuiteHistory {
-    final case class Cell(status: Status)
-    sealed trait Status extends Product with Serializable
+
+    final case class Cell(id: Unique, status: Status)
+
+    sealed trait Status extends Product with Serializable {
+      import Status._
+
+      def stringify: String = this match {
+        case Status.Pending => "▫"
+        case _              => "◼"
+      }
+
+      def color: String = this match {
+        case Pending   => Console.RESET
+        case Running   => Console.YELLOW
+        case Succeeded => Console.GREEN
+        case Failed    => Console.RED
+      }
+    }
 
     object Status {
-      case class Pending(id: Unique) extends Status
-      case class Running(id: Unique) extends Status
+      case object Pending extends Status
+      case object Running extends Status
       case object Succeeded extends Status
       case object Failed extends Status
+
+      implicit val eq: Eq[Status] = Eq.fromUniversalEquals
     }
 
     val initial: SuiteHistory = SuiteHistory(Nil)
@@ -140,28 +165,28 @@ object Reporter {
       MState[F].modify(
         c =>
           c.copy(c.cells.filter {
-            case Cell(Status.Pending(`toRemove`)) => false
+            case Cell(`toRemove`, Status.Pending) => false
             case _                                => true
           } ++ cells.toList)
       )
 
     def markRunning[F[_]: MState](id: Unique): F[Unit] = updateStatus[F] {
-      case SuiteHistory.Status.Pending(`id`) => SuiteHistory.Status.Running(id)
-      case unchanged                         => unchanged
+      case Cell(`id`, SuiteHistory.Status.Pending) => SuiteHistory.Status.Running
+      case cell                                    => cell.status
     }
 
     def markFinished[F[_]: MState](id: Unique): F[Unit] = updateStatus[F] {
-      case SuiteHistory.Status.Running(`id`) => SuiteHistory.Status.Succeeded
-      case unchanged                         => unchanged
+      case Cell(`id`, SuiteHistory.Status.Running) => SuiteHistory.Status.Succeeded
+      case cell                                    => cell.status
     }
 
     //sub-optimal map, could stop early
     //todo rename to *firstStatus when changed
-    def updateStatus[F[_]: MState](update: Status => Status): F[Unit] =
+    def updateStatus[F[_]: MState](update: Cell => Status): F[Unit] =
       MState[F].modify { history =>
         history.copy(
           cells = history.cells.map { cell =>
-            SuiteHistory.Cell(update(cell.status))
+            SuiteHistory.Cell(cell.id, update(cell))
           }
         )
       }
@@ -204,7 +229,7 @@ object Reporter {
             case Event.SuiteFinished(_, id) => SuiteHistory.markFinished(id)
             case Event.ReplaceSuiteWith(toRemove, toReplace) =>
               val newCells: NonEmptyList[SuiteHistory.Cell] =
-                toReplace.map(SuiteHistory.Status.Pending(_)).map(SuiteHistory.Cell(_))
+                toReplace.tupleRight(SuiteHistory.Status.Pending).map(SuiteHistory.Cell.tupled)
               SuiteHistory.replace(toRemove, newCells)
 
             case _ => Applicative[F].unit
