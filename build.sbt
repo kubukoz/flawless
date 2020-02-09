@@ -39,7 +39,16 @@ val noPublish = Seq(skip in publish := true)
 val core = project.settings(commonSettings).settings(name += "-core")
 
 val tests =
-  project.settings(commonSettings).settings(name += "-tests").settings(noPublish).dependsOn(core)
+  project
+    .settings(
+      commonSettings,
+      libraryDependencies ++= List(
+        "com.softwaremill.diffx" %% "diffx-cats" % "0.3.17"
+      )
+    )
+    .settings(name += "-tests")
+    .settings(noPublish)
+    .dependsOn(core)
 
 val examples =
   project
