@@ -79,7 +79,7 @@ package object eval {
     val _ = args
     //todo actually read the args
     Settings(visual = true).pure[F]
-    Settings(visual = false).pure[F]
+    // Settings(visual = false).pure[F]
     // Settings(visual = args.contains("visual")).pure[F]
   }
 }

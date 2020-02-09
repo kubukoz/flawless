@@ -16,28 +16,30 @@ import cats.effect.Sync
 import cats.effect.Bracket
 import cats.Foldable
 import flawless.data.Assertion
-import flawless.eval.UniqueFactory
-import cats.effect.SyncIO
-import flawless.eval.unique
-import cats.Applicative
+import cats.data.NonEmptyList
+import cats.data.StateT
+import com.softwaremill.diffx.cats._
 
 //Sync, because Bracket for WriterT isn't explicitly written
 final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
-  type WC[A] = WriterT[F, Chain[Reporter.Event], A]
+  type WCC[A] = WriterT[F, Chain[Reporter.Event[Int]], A]
+  type WC[A] = StateT[WCC, Int, A]
 
-  implicit val bracketWriter: Bracket[WC, Throwable] = Sync.catsWriterTSync
+  implicit val bracketWriter: Bracket[WCC, Throwable] = Sync.catsWriterTSync
+  implicit val bracketState: Bracket[WC, Throwable] = Sync.catsStateTSync
 
-  //let's be serious
-  val id = UniqueFactory[SyncIO].get.unsafeRunSync()
+  val reporter: Reporter[WC] { type Identifier = Int } = new Reporter[WC] {
+    type Identifier = Int
 
-  implicit val uniqueFactory: UniqueFactory[WC] = new UniqueFactory[WC] {
-    val get: WC[unique.Unique] = Applicative[WC].pure(id)
+    val ident: WC[Identifier] = StateT { i =>
+      (i + 1, i).pure[WCC]
+    }
+    def publish(event: Reporter.Event[Identifier]): WC[Unit] = StateT.liftF(WriterT.tell(event.pure[Chain]))
   }
 
-  val reporter: Reporter[WC] = a => WriterT.tell(a.pure[Chain])
   val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
 
-  implicit val showEvent: Show[Reporter.Event] = Show.fromToString
+  implicit val showEvent: Show[Reporter.Event[Int]] = Show.fromToString
 
   val simpleSuite = suite[WC]("suite 1") {
     tests(
@@ -48,7 +50,7 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
 
   import Reporter.Event._
 
-  val simpleEvents = List(
+  def simpleEvents(id: Int): List[Reporter.Event[Int]] = List(
     SuiteStarted("suite 1", id),
     TestStarted("test 1"),
     TestFinished("test 1"),
@@ -59,26 +61,26 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
 
   def simpleResource(suite: Suite[WC]): Suite[WC] = Suite.resource(suite.pure[Resource[WC, *]])
 
-  def ensureReported[G[_]: Foldable](suite: Suite[WC])(expectedWritten: G[Reporter.Event]): F[Assertion] =
-    interpreter.interpret(reporter)(suite).written.map(_.toList).map(ensureEqualEq(_, expectedWritten.toList))
+  def ensureReported[G[_]: Foldable](suite: Suite[WC])(expectedWritten: G[Reporter.Event[Int]]): F[Assertion] =
+    interpreter.interpret(reporter)(suite).runA(0).written.map(_.toList).map(ensureEqual(_, expectedWritten.toList))
 
   //todo: these would be good property tests
   val runSuite: Suite[F] = suite(getClass.getSimpleName) {
     tests(
       test("single suite") {
-        ensureReported(simpleSuite)(simpleEvents)
+        ensureReported(simpleSuite)(simpleEvents(0))
       },
       test("sequence of suites") {
         ensureReported {
           Suite.sequential(simpleSuite, simpleSuite)
         } {
-          List(ExtraSuitesReported(1)) ++
-            simpleEvents ++
-            simpleEvents
+          List(ReplaceSuiteWith(0, NonEmptyList.of(1, 2))) ++
+            simpleEvents(1) ++
+            simpleEvents(2)
         }
       },
       test("resource doesn't allocate extra suites") {
-        ensureReported(simpleResource(simpleSuite))(simpleEvents)
+        ensureReported(simpleResource(simpleSuite))(simpleEvents(0))
       },
       test("sequence in resource") {
         ensureReported {
@@ -94,12 +96,12 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
           )
         } {
           List(
-            ExtraSuitesReported(2).pure[List],
-            simpleEvents,
-            simpleEvents,
-            ExtraSuitesReported(1).pure[List],
-            simpleEvents,
-            simpleEvents
+            ReplaceSuiteWith(0, NonEmptyList.of(1, 2, 3)).pure[List],
+            simpleEvents(1),
+            simpleEvents(2),
+            ReplaceSuiteWith(3, NonEmptyList.of(4, 5)).pure[List],
+            simpleEvents(4),
+            simpleEvents(5)
           ).flatten
         }
       }
