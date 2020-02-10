@@ -30,4 +30,4 @@ See [design doc](DESIGN.md) and [watch the talk](https://vimeo.com/368027707)!
 
 - [runaid/runaid](https://github.com/runaid/runaid)
 - [kubukoz/datas](https://github.com/kubukoz/datas)
-- [flawless itself](tests/src/main/scala/flawless/tests)
+- [flawless itself](tests/src/main/scala/flawlessly)
