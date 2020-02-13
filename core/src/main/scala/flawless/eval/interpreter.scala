@@ -201,7 +201,7 @@ object Reporter {
 
     def show[F[_]: MState: FlatMap: ConsoleOut]: F[Unit] =
       MState[F].get.flatMap { result =>
-        val clear = "\033[2J\033[H"
+        val clear = "\u001b[2J\u001b[H"
 
         if (result.cells.map(_.status).contains_(Status.Pending))
           ConsoleOut[F].putStrLn(clear ++ result.stringify)
