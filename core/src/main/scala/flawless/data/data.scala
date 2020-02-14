@@ -1,6 +1,6 @@
 package flawless.data
 
-import cats.data.NonEmptyList
+import cats.data.NonEmptyChain
 import cats.implicits._
 import cats.Applicative
 import cats.Id
@@ -20,22 +20,24 @@ import flawless.data.Assertion.Result
 import flawless.data.Assertion.One
 import flawless.data.Assertion.All
 import scala.annotation.tailrec
+import cats.data.Chain
+import cats.data.NonEmptyList
 
 sealed trait Assertion extends Product with Serializable {
 
-  def results: NonEmptyList[Result] = {
+  def results: NonEmptyChain[Result] = {
     // Manual recursion instead of trampolining, to save some space on lambdas
     @tailrec
-    def go(remaining: List[Assertion], results: List[Result]): List[Result] = remaining match {
-      case One(result) :: t     => go(t, result :: results)
+    def go(remaining: List[Assertion], results: Chain[Result]): Chain[Result] = remaining match {
+      case One(result) :: t     => go(t, results.append(result))
       case All(assertions) :: t => go(assertions.toList ::: t, results)
-      case Nil                  => results.reverse
+      case Nil                  => results
     }
 
     // This is really safe, okay?
     // Nil could only ever be returned if no assertions were provided, and we start with `this`, so there's always one.
     // If this ever throws - there's a bug in flawless.
-    NonEmptyList.fromListUnsafe(go(List(this), Nil))
+    NonEmptyChain.fromChainUnsafe(go(List(this), Chain.nil))
   }
 }
 
@@ -51,6 +53,17 @@ object Assertion {
 
   def one(result: Result): Assertion = One(result)
 
+  def all(assertions: NonEmptyChain[Assertion]): Assertion = assertions.reduceLeft { (a, b) =>
+    All {
+      (a, b) match {
+        case (All(x1), All(x2)) => (x1 <+> x2)
+        case (All(x1), _)       => x1.append(b)
+        case (_, All(y2))       => y2.prepend(a)
+        case _                  => NonEmptyChain(a, b)
+      }
+    }
+  }
+
   sealed trait Result extends Product with Serializable {
 
     def isSuccessful: Boolean = this match {
@@ -65,11 +78,10 @@ object Assertion {
   }
 
   final case class One(result: Result) extends Assertion
-  final case class All(assertions: NonEmptyList[Assertion]) extends Assertion
+  final case class All(assertions: NonEmptyChain[Assertion]) extends Assertion
 
   implicit val assertionMonoid: Monoid[Assertion] = new Monoid[Assertion] {
-    //todo optimize for nested sequences
-    def combine(x: Assertion, y: Assertion): Assertion = All(NonEmptyList.of(x, y))
+    def combine(x: Assertion, y: Assertion): Assertion = all(NonEmptyChain(x, y))
     val empty: Assertion = successful
   }
 }

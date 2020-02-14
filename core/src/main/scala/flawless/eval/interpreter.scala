@@ -64,7 +64,11 @@ object Interpreter {
             suite.tests.nonEmptyTraverse(interpretTest(reporter).apply(_)).map(finish).flatTap { suiteResult =>
               //todo duplicated logic!!!!
               val isSuccessful =
-                suiteResult.tests.map(_.result.assertions[cats.Id]).flatMap(_.results).forall(_.isSuccessful)
+                suiteResult
+                  .tests
+                  .map(_.result.assertions[cats.Id])
+                  .flatMap(_.results.toNonEmptyList)
+                  .forall(_.isSuccessful)
 
               reporter.publish(Reporter.Event.SuiteFinished(suite.name, id, isSuccessful))
             }

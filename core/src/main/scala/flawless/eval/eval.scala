@@ -3,6 +3,7 @@ package flawless
 import cats.effect.ConsoleOut
 import cats.FlatMap
 import cats.data.NonEmptyList
+import cats.data.NonEmptyChain
 import cats.effect.ExitCode
 import cats.Id
 import cats.implicits._
@@ -29,14 +30,14 @@ package object eval {
       AnsiColor.RED + s + AnsiColor.RESET
 
     def inColor(test: Test[Id]): String = {
-      val assertions = test.result.assertions.flatMap(_.results)
+      val results: NonEmptyChain[Assertion.Result] = test.result.assertions.flatMap(_.results)
 
-      val successful = assertions.forall(_.isSuccessful)
+      val successful = results.forall(_.isSuccessful)
       val testName =
         if (successful) inGreen(show"Passed: ${test.name}")
         else inRed(show"Failed: ${test.name}")
 
-      val failedAssertions = assertions.toList.collect {
+      val failedAssertions: List[String] = results.toList.collect {
         case Assertion.Result.Failed(failure) =>
           inRed(
             // show"${failure.text} (${failure.location})"

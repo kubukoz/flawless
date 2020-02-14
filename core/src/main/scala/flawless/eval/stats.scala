@@ -5,6 +5,7 @@ import cats.Foldable
 import cats.Show
 import cats.implicits._
 import cats.data.NonEmptyList
+import cats.data.NonEmptyChain
 import cats.Id
 import flawless.data.Suite
 import flawless.data.Test
@@ -43,7 +44,7 @@ object RunStats {
     private val testAssertions: Getter[Test[Id], Assertion] =
       Getter((_: Test[Id]).result).composeGetter(testRunToAssertions)
 
-    private val assertionResults: Getter[Assertion, NonEmptyList[Assertion.Result]] = Getter(_.results)
+    private val assertionResults: Getter[Assertion, NonEmptyChain[Assertion.Result]] = Getter(_.results)
 
     val suiteToTests: Fold[Suite[Id], Test[Id]] =
       suiteTests.composeFold(Fold.fromFoldable)
