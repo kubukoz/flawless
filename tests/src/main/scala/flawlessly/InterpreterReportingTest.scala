@@ -19,6 +19,7 @@ import flawless.data.Assertion
 import cats.data.NonEmptyList
 import cats.data.StateT
 import com.softwaremill.diffx.cats._
+import cats.Parallel
 
 //Sync, because Bracket for WriterT isn't explicitly written
 final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
@@ -27,6 +28,9 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
 
   implicit val bracketWriter: Bracket[WCC, Throwable] = Sync.catsWriterTSync
   implicit val bracketState: Bracket[WC, Throwable] = Sync.catsStateTSync
+
+  //The instance shall not be used for parallelism!
+  implicit val parallelState: Parallel[WC] = Parallel.identity
 
   val reporter: Reporter[WC] { type Identifier = Int } = new Reporter[WC] {
     type Identifier = Int
@@ -73,6 +77,59 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
       test("sequence of suites") {
         ensureReported {
           Suite.sequential(simpleSuite, simpleSuite)
+        } {
+          List(ReplaceSuiteWith(0, NonEmptyList.of(1, 2))) ++
+            simpleEvents(1) ++
+            simpleEvents(2)
+        }
+      },
+      test("nested sequence of suites - left side") {
+        ensureReported {
+          Suite.sequential(Suite.sequential(simpleSuite), simpleSuite, simpleSuite)
+        } {
+          List(ReplaceSuiteWith(0, NonEmptyList.of(1, 2, 3))) ++
+            simpleEvents(1) ++
+            simpleEvents(2) ++
+            simpleEvents(3)
+        }
+      },
+      test("nested sequence of suites - right side") {
+        ensureReported {
+          Suite.sequential(simpleSuite, simpleSuite, Suite.sequential(simpleSuite))
+        } {
+          List(ReplaceSuiteWith(0, NonEmptyList.of(1, 2, 3))) ++
+            simpleEvents(1) ++
+            simpleEvents(2) ++
+            simpleEvents(3)
+        }
+      },
+      test("nested sequence of suites - within parallel node") {
+        ensureReported {
+          Suite.parallel(
+            simpleSuite,
+            simpleSuite,
+            Suite.sequential(
+              Suite.sequential(
+                Suite.sequential(simpleSuite),
+                simpleSuite
+              ),
+              Suite.sequential(simpleSuite, simpleSuite)
+            )
+          )
+        } {
+          List(ReplaceSuiteWith(0, NonEmptyList.of(1, 2, 3))) ++
+            simpleEvents(1) ++
+            simpleEvents(2) ++
+            List(ReplaceSuiteWith(3, NonEmptyList.of(4, 5, 6, 7))) ++
+            simpleEvents(4) ++
+            simpleEvents(5) ++
+            simpleEvents(6) ++
+            simpleEvents(7)
+        }
+      },
+      test("nested sequence of suites - both sides") {
+        ensureReported {
+          Suite.sequential(Suite.sequential(simpleSuite), Suite.sequential(simpleSuite))
         } {
           List(ReplaceSuiteWith(0, NonEmptyList.of(1, 2))) ++
             simpleEvents(1) ++

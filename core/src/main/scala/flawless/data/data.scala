@@ -22,6 +22,7 @@ import flawless.data.Assertion.All
 import scala.annotation.tailrec
 import cats.data.Chain
 import cats.data.NonEmptyList
+import cats.kernel.Eq
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -91,6 +92,11 @@ object Assertion {
   */
 sealed trait Traversal[F[_]] extends Product with Serializable {
 
+  def kind: Traversal.Kind = this match {
+    case Traversal.Parallel(_)   => Traversal.Kind.Parallel
+    case Traversal.Sequential(_) => Traversal.Kind.Sequential
+  }
+
   final def traverse[S[_]: NonEmptyTraverse, A, B](as: S[A])(f: A => F[B]): F[S[B]] = this match {
     case Traversal.Sequential(a) => as.nonEmptyTraverse(f)(a)
     case Traversal.Parallel(nep) => Parallel.parNonEmptyTraverse(as)(f)(NonEmptyTraverse[S], nep)
@@ -103,6 +109,15 @@ object Traversal {
 
   final private case class Parallel[F[_]](nep: NonEmptyParallel[F]) extends Traversal[F]
   final private case class Sequential[F[_]](apply: Apply[F]) extends Traversal[F]
+
+  sealed trait Kind extends Product with Serializable
+
+  object Kind {
+    case object Parallel extends Kind
+    case object Sequential extends Kind
+
+    implicit val eq: Eq[Kind] = Eq.fromUniversalEquals
+  }
 
   // (potentially specialized) implementation of Sequential for Id,
   // which means identity in case of `sequence` and `map` in case of `traverse`.
@@ -170,8 +185,14 @@ object Suite {
   def sequence[F[_]: Apply](suitesSequence: NonEmptyList[Suite[F]]): Suite[F] =
     combineWith(suitesSequence)(Traversal.sequential)
 
-  def combineWith[F[_]](suites: NonEmptyList[Suite[F]])(traversal: Traversal[F]): Suite[F] =
-    algebra.Sequence(suites, traversal)
+  def combineWith[F[_]](suites: NonEmptyList[Suite[F]])(traversal: Traversal[F]): Suite[F] = {
+    val flattenedSameTraversal: NonEmptyList[Suite[F]] = suites.flatMap {
+      case seq: algebra.Sequence[f] if seq.traversal.kind === traversal.kind => seq.suites
+      case other: Suite[F]                                                   => NonEmptyList.one(other)
+    }
+
+    algebra.Sequence(flattenedSameTraversal, traversal)
+  }
 
   def resource[F[_]: Bracket[*[_], Throwable]](suitesInResource: Resource[F, Suite[F]]): Suite[F] =
     algebra.RResource(suitesInResource, Bracket[F, Throwable])
