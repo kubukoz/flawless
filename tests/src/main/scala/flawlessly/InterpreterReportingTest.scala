@@ -26,8 +26,9 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
   type WCC[A] = WriterT[F, Chain[Reporter.Event[Int]], A]
   type WC[A] = StateT[WCC, Int, A]
 
-  implicit val bracketWriter: Bracket[WCC, Throwable] = Sync.catsWriterTSync
-  implicit val bracketState: Bracket[WC, Throwable] = Sync.catsStateTSync
+  //for Bracket instances
+  import Sync.catsStateTSync
+  import Sync.catsWriterTSync
 
   //The instance shall not be used for parallelism!
   implicit val parallelState: Parallel[WC] = Parallel.identity
