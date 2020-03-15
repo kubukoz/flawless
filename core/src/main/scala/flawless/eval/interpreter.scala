@@ -110,6 +110,8 @@ trait Reporter[F[_]] {
 }
 
 object Reporter {
+  type Aux[F[_], Ident] = Reporter[F] { type Identifier = Ident }
+
   sealed trait Event[Identifier] extends Product with Serializable
 
   object Event {

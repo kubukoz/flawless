@@ -10,36 +10,43 @@ import cats.data.Chain
 import flawless.eval.Reporter
 import flawless.eval.Interpreter
 import cats.Show
-import cats.data.WriterT
 import cats.effect.Resource
 import cats.effect.Sync
-import cats.effect.Bracket
 import cats.Foldable
 import flawless.data.Assertion
 import cats.data.NonEmptyList
-import cats.data.StateT
 import com.softwaremill.diffx.cats._
 import cats.Parallel
+import cats.mtl.MonadState
+import cats.mtl.FunctorTell
+import cats.mtl.instances.all._
+import cats.Alternative
+import cats.Monad
+import cats.data.`package`.ReaderWriterStateT
 
 //Sync, because Bracket for WriterT isn't explicitly written
 final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
-  type WCC[A] = WriterT[F, Chain[Reporter.Event[Int]], A]
-  type WC[A] = StateT[WCC, Int, A]
+  type WC[A] = ReaderWriterStateT[F, Unit, Chain[Reporter.Event[Int]], Int, A]
 
-  //for Bracket instances
-  import Sync.catsStateTSync
-  import Sync.catsWriterTSync
-
-  //The instance shall not be used for parallelism!
+  //The instance shall not be used for parallelism! It's pretty much just a marker
   implicit val parallelState: Parallel[WC] = Parallel.identity
 
-  val reporter: Reporter[WC] { type Identifier = Int } = new Reporter[WC] {
-    type Identifier = Int
+  import Sync.catsReaderWriteStateTSync
 
-    val ident: WC[Identifier] = StateT { i =>
-      (i + 1, i).pure[WCC]
+  val reporter: Reporter.Aux[WC, Int] = {
+    def make[
+      M[_]: MonadState[*[_], Int]: Monad: FunctorTell[*[_], S[Reporter.Event[Int]]],
+      S[_]: Alternative
+    ]: Reporter.Aux[M, Int] = new Reporter[M] {
+      type Identifier = Int
+
+      val ident: M[Identifier] = MonadState[M, Int].get <* MonadState[M, Int].modify(_ + 1)
+
+      def publish(event: Reporter.Event[Identifier]): M[Unit] =
+        FunctorTell[M, S[Reporter.Event[Int]]].tell(event.pure[S])
     }
-    def publish(event: Reporter.Event[Identifier]): WC[Unit] = StateT.liftF(WriterT.tell(event.pure[Chain]))
+
+    make[WC, Chain]
   }
 
   val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
@@ -67,7 +74,7 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
   def simpleResource(suite: Suite[WC]): Suite[WC] = Suite.resource(suite.pure[Resource[WC, *]])
 
   def ensureReported[G[_]: Foldable](suite: Suite[WC])(expectedWritten: G[Reporter.Event[Int]]): F[Assertion] =
-    interpreter.interpret(reporter)(suite).runA(0).written.map(_.toList).map(ensureEqual(_, expectedWritten.toList))
+    interpreter.interpret(reporter)(suite).written.runA((), 0).map(_.toList).map(ensureEqual(_, expectedWritten.toList))
 
   //todo: these would be good property tests
   val runSuite: Suite[F] = suite(getClass.getSimpleName) {
