@@ -25,7 +25,7 @@ val commonSettings = Seq(
   name := "flawless",
   scalacOptions -= "-Xfatal-warnings",
   libraryDependencies ++= List(
-    "co.fs2" %% "fs2-core" % "2.2.2",
+    "co.fs2" %% "fs2-core" % "2.3.0",
     "com.olegpy" %% "meow-mtl-effects" % "0.4.0",
     "com.olegpy" %% "meow-mtl-core" % "0.4.0",
     "org.typelevel" %% "cats-tagless-macros" % "0.11",
