@@ -58,7 +58,7 @@ val examples =
       commonSettings,
       libraryDependencies ++= List(
         "org.tpolecat" %% "doobie-hikari" % "0.8.8",
-        "org.postgresql" % "postgresql" % "42.2.11"
+        "org.postgresql" % "postgresql" % "42.2.12"
       )
     )
     .settings(name += "-tests", skip in publish := true)
