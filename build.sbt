@@ -57,7 +57,7 @@ val examples =
     .settings(
       commonSettings,
       libraryDependencies ++= List(
-        "org.tpolecat" %% "doobie-hikari" % "0.8.8",
+        "org.tpolecat" %% "doobie-hikari" % "0.9.0",
         "org.postgresql" % "postgresql" % "42.2.12"
       )
     )
