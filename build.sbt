@@ -30,7 +30,7 @@ val commonSettings = Seq(
     "com.olegpy" %% "meow-mtl-core" % "0.4.0",
     "org.typelevel" %% "cats-tagless-macros" % "0.11",
     "com.github.julien-truffaut" %% "monocle" % "2.0.3",
-    "org.typelevel" %% "cats-effect" % "2.1.2",
+    "org.typelevel" %% "cats-effect" % "2.1.3",
     "dev.profunktor" %% "console4cats" % "0.8.1",
     "com.softwaremill.diffx" %% "diffx-core" % "0.3.27"
   ) ++ compilerPlugins
