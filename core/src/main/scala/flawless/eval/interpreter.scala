@@ -85,15 +85,13 @@ object Interpreter {
           case s: Sequence[f] =>
             type IdentifiedSuites = NonEmptyList[(Suite[f], reporter.Identifier)]
 
-            val reportSuites: IdentifiedSuites => f[Unit] = suites =>
-              reporter.publish(Reporter.Event.ReplaceSuiteWith(parentId, suites.map(_._2)))
-
             val interpretSuites: IdentifiedSuites => f[NonEmptyList[Suite[NoEffect]]] =
               s.traversal.traverse(_) { case (suite, id) => interpretOne(id)(suite) }
 
-            s.suites
-              .traverse((reporter.ident: f[reporter.Identifier]).tupleLeft(_))
-              .flatTap(reportSuites)
+            val suiteCount = s.suites.length
+
+            (reporter.createChildren(parentId, suiteCount): f[NonEmptyList[reporter.Identifier]])
+              .map((idents: NonEmptyList[reporter.Identifier]) => s.suites.zipWith(idents)((_, _)))
               .flatMap(interpretSuites)
               .map(Suite.sequence[f](_))
           case o: One[f]       => interpretSuite(reporter)(parentId)(o)
@@ -110,7 +108,7 @@ object Interpreter {
 trait Reporter[F[_]] {
   type Identifier
   def root: Identifier
-  def ident: F[Identifier]
+  def createChildren(parent: Identifier, count: Int): F[NonEmptyList[Identifier]]
   def publish(event: Reporter.Event[Identifier]): F[Unit]
 }
 
@@ -125,9 +123,6 @@ object Reporter {
     final case class SuiteStarted[Identifier](name: String, id: Identifier) extends Event[Identifier]
 
     final case class SuiteFinished[Identifier](name: String, id: Identifier, succeeded: Boolean)
-      extends Event[Identifier]
-
-    final case class ReplaceSuiteWith[Identifier](replace: Identifier, withSuites: NonEmptyList[Identifier])
       extends Event[Identifier]
 
     implicit def eq[Identifier]: Eq[Event[Identifier]] = Eq.fromUniversalEquals
@@ -245,7 +240,15 @@ object Reporter {
 
       val root: Int = 0
 
-      val ident: F[Identifier] = identifiers.modify(a => (a + 1, a))
+      private val ident: F[Identifier] = identifiers.modify(a => (a + 1, a))
+
+      def createChildren(parent: Int, count: Int): F[NonEmptyList[Int]] = {
+        val ids = ident.replicateA(count).map(NonEmptyList.fromListUnsafe)
+
+        ids.flatTap { newIds =>
+          putSuite(show"Replacing suite $parent with $newIds")
+        }
+      }
 
       private def putStrWithDepth(depth: Int): String => F[Unit] = s => ConsoleOut[F].putStrLn(" " * depth * 2 + s)
 
@@ -258,7 +261,6 @@ object Reporter {
         case Event.SuiteStarted(name, id) => putSuite(show"Starting suite: $name with id $id")
         case Event.SuiteFinished(name, id, succ) =>
           putSuite(show"Finished suite: $name with id $id. Succeeded? $succ")
-        case Event.ReplaceSuiteWith(toRemove, toReplace) => putSuite(show"Replacing suite $toRemove with $toReplace")
       }
     }
   }
@@ -273,18 +275,21 @@ object Reporter {
         new Reporter[F] {
           type Identifier = Unique
           val root: Unique = rootIdent
-          val ident: F[Unique] = newId
+
+          def createChildren(parent: Unique, count: Int): F[NonEmptyList[Unique]] = {
+            val newIds = newId.replicateA(count).map(NonEmptyList.fromListUnsafe)
+
+            newIds.flatTap { ids =>
+              val newCells = ids.map(SuiteHistory.Cell(_, SuiteHistory.Status.Pending))
+              SuiteHistory.replace[F](parent, newCells)
+            }
+          }
 
           def publish(event: Event[Identifier]): F[Unit] = {
             event match {
               case Event.SuiteStarted(_, id)        => SuiteHistory.markRunning(id)
               case Event.SuiteFinished(_, id, succ) => SuiteHistory.markFinished(id, succ)
-              case Event.ReplaceSuiteWith(toRemove, toReplace) =>
-                val newCells: NonEmptyList[SuiteHistory.Cell] =
-                  toReplace.map(SuiteHistory.Cell(_, SuiteHistory.Status.Pending))
-                SuiteHistory.replace(toRemove, newCells)
-
-              case _ => Applicative[F].unit
+              case _                                => Applicative[F].unit
             }
           } *> SuiteHistory.show
         }
