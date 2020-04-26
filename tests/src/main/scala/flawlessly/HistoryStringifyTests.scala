@@ -5,6 +5,7 @@ import flawless._
 import flawless.syntax._
 import cats.implicits._
 import flawless.eval.unique.Unique
+import cats.data.Chain
 
 object HistoryStringifyTests extends SuiteClass[NoEffect] {
   import flawless.eval.Reporter.SuiteHistory
@@ -22,7 +23,7 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
       },
       pureTest("stringify on a history") {
         val history = SuiteHistory(
-          List(
+          Chain(
             4 -> Status.Succeeded,
             1 -> Status.Failed,
             1 -> Status.Succeeded,
@@ -32,7 +33,7 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
             2 -> Status.Pending,
             1 -> Status.Succeeded,
             2 -> Status.Pending
-          ).flatMap { case (n, status) => List.fill(n)(status) }.map(Cell(u, _))
+          ).flatMap { case (n, status) => Chain.fromSeq(List.fill(n)(status)) }.map(Cell(u, _))
         )
 
         def green(s: String) = Console.GREEN ++ s

@@ -19,6 +19,10 @@ import cats.effect.concurrent.Ref
 import cats.FlatMap
 import cats.MonadError
 import scala.util.control.NonFatal
+import monocle.macros.Lenses
+import scala.annotation.tailrec
+import cats.data.Chain
+import cats.data.Chain.==:
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -81,15 +85,13 @@ object Interpreter {
           case s: Sequence[f] =>
             type IdentifiedSuites = NonEmptyList[(Suite[f], reporter.Identifier)]
 
-            val reportSuites: IdentifiedSuites => f[Unit] = suites =>
-              reporter.publish(Reporter.Event.ReplaceSuiteWith(parentId, suites.map(_._2)))
-
             val interpretSuites: IdentifiedSuites => f[NonEmptyList[Suite[NoEffect]]] =
               s.traversal.traverse(_) { case (suite, id) => interpretOne(id)(suite) }
 
-            s.suites
-              .traverse((reporter.ident: f[reporter.Identifier]).tupleLeft(_))
-              .flatTap(reportSuites)
+            val suiteCount = s.suites.length
+
+            (reporter.splitParent(parentId, suiteCount): f[NonEmptyList[reporter.Identifier]])
+              .map((idents: NonEmptyList[reporter.Identifier]) => s.suites.zipWith(idents)((_, _)))
               .flatMap(interpretSuites)
               .map(Suite.sequence[f](_))
           case o: One[f]       => interpretSuite(reporter)(parentId)(o)
@@ -97,7 +99,7 @@ object Interpreter {
           case r: RResource[f] => r.resuite.use(interpretOne(parentId))(r.bracket)
         }
 
-        s => reporter.ident.flatMap(interpretOne(_)(s))
+        interpretOne(reporter.root)
       }
     }
 }
@@ -105,7 +107,10 @@ object Interpreter {
 @finalAlg
 trait Reporter[F[_]] {
   type Identifier
-  def ident: F[Identifier]
+  def root: Identifier
+
+  // Replaces the parent identifier with [[count]] new identifiers.
+  def splitParent(parent: Identifier, count: Int): F[NonEmptyList[Identifier]]
   def publish(event: Reporter.Event[Identifier]): F[Unit]
 }
 
@@ -122,18 +127,16 @@ object Reporter {
     final case class SuiteFinished[Identifier](name: String, id: Identifier, succeeded: Boolean)
       extends Event[Identifier]
 
-    final case class ReplaceSuiteWith[Identifier](replace: Identifier, withSuites: NonEmptyList[Identifier])
-      extends Event[Identifier]
-
     implicit def eq[Identifier]: Eq[Event[Identifier]] = Eq.fromUniversalEquals
   }
 
-  final case class SuiteHistory(cells: List[SuiteHistory.Cell]) {
+  @Lenses
+  final case class SuiteHistory(cells: Chain[SuiteHistory.Cell]) {
 
     //reference implementation, will be overridden for more performance (and possibly no fs2 dependency)
     def stringify: String = {
       fs2.Stream.emit(Console.RESET) ++
-        fs2.Stream.emits(cells).groupAdjacentBy(_.status).map(_.map(_.size)).map {
+        cells.foldMap(fs2.Stream.emit(_)).groupAdjacentBy(_.status).map(_.map(_.size)).map {
           case (status, cellCount) => status.color ++ status.stringify.combineN(cellCount)
         } ++
         fs2.Stream.emit(Console.RESET)
@@ -169,18 +172,36 @@ object Reporter {
       implicit val eq: Eq[Status] = Eq.fromUniversalEquals
     }
 
-    val initial: SuiteHistory = SuiteHistory(Nil)
+    def initial(rootId: Unique): SuiteHistory = SuiteHistory(Chain.one(Cell(rootId, Status.Pending)))
 
     type MState[F[_]] = MonadState[F, SuiteHistory]
     def MState[F[_]](implicit F: MState[F]): MState[F] = F
 
+    /* private */
+    def flatReplaceFirst[A](f: PartialFunction[A, Chain[A]]): Chain[A] => Chain[A] = {
+
+      @tailrec
+      def go(list: Chain[A], memory: Chain[A]): Chain[A] = list match {
+        case Chain.nil => memory
+        case head ==: tail =>
+          f.lift(head) match {
+            case Some(elems) => memory ++ elems ++ tail
+            case None        => go(tail, memory append head)
+          }
+      }
+
+      go(_, Chain.nil)
+    }
+
     def replace[F[_]: MState](toRemove: Unique, cells: NonEmptyList[Cell]): F[Unit] =
       MState[F].modify(
-        c =>
-          c.copy(c.cells.filter {
-            case Cell(`toRemove`, Status.Pending) => false
-            case _                                => true
-          } ++ cells.toList)
+        SuiteHistory
+          .cells
+          .modify(
+            flatReplaceFirst {
+              case Cell(`toRemove`, Status.Pending) => Chain.fromSeq(cells.toList)
+            }
+          )
       )
 
     def markRunning[F[_]: MState](id: Unique): F[Unit] = updateStatus[F] {
@@ -208,8 +229,8 @@ object Reporter {
     def show[F[_]: MState: FlatMap: ConsoleOut]: F[Unit] =
       MState[F].get.flatMap { result =>
         val clear = "\u001b[2J\u001b[H"
-
-        if (result.cells.map(_.status).contains_(Status.Pending))
+        //no `map` for laziness
+        if (result.cells.exists(_.status === Status.Pending))
           ConsoleOut[F].putStrLn(clear ++ result.stringify)
         else ConsoleOut[F].putStrLn(clear ++ "Finished")
       }
@@ -218,7 +239,18 @@ object Reporter {
   def consoleInstance[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = Ref[F].of(0).map { identifiers =>
     new Reporter[F] {
       type Identifier = Int
-      val ident: F[Identifier] = identifiers.modify(a => (a + 1, a))
+
+      val root: Int = 0
+
+      private val ident: F[Identifier] = identifiers.modify(a => (a + 1, a))
+
+      def splitParent(parent: Int, count: Int): F[NonEmptyList[Int]] = {
+        val ids = ident.replicateA(count).map(NonEmptyList.fromListUnsafe)
+
+        ids.flatTap { newIds =>
+          putSuite(show"Replacing suite $parent with $newIds")
+        }
+      }
 
       private def putStrWithDepth(depth: Int): String => F[Unit] = s => ConsoleOut[F].putStrLn(" " * depth * 2 + s)
 
@@ -231,31 +263,39 @@ object Reporter {
         case Event.SuiteStarted(name, id) => putSuite(show"Starting suite: $name with id $id")
         case Event.SuiteFinished(name, id, succ) =>
           putSuite(show"Finished suite: $name with id $id. Succeeded? $succ")
-        case Event.ReplaceSuiteWith(toRemove, toReplace) => putSuite(show"Replacing suite $toRemove with $toReplace")
       }
     }
   }
 
   import com.olegpy.meow.effects._
 
-  def visual[F[_]: Sync: ConsoleOut]: F[Reporter[F]] =
-    Ref[F].of(SuiteHistory.initial).map(_.stateInstance).map { implicit S =>
-      new Reporter[F] {
-        type Identifier = Unique
-        val ident: F[Unique] = Sync[F].delay(new Unique)
+  def visual[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = {
+    val newId = Sync[F].delay(new Unique)
 
-        def publish(event: Event[Identifier]): F[Unit] = {
-          event match {
-            case Event.SuiteStarted(_, id)        => SuiteHistory.markRunning(id)
-            case Event.SuiteFinished(_, id, succ) => SuiteHistory.markFinished(id, succ)
-            case Event.ReplaceSuiteWith(toRemove, toReplace) =>
-              val newCells: NonEmptyList[SuiteHistory.Cell] =
-                toReplace.tupleRight(SuiteHistory.Status.Pending).map(SuiteHistory.Cell.tupled)
-              SuiteHistory.replace(toRemove, newCells)
+    newId.flatMap { rootIdent =>
+      Ref[F].of(SuiteHistory.initial(rootIdent)).map(_.stateInstance).map { implicit S =>
+        new Reporter[F] {
+          type Identifier = Unique
+          val root: Unique = rootIdent
 
-            case _ => Applicative[F].unit
+          def splitParent(parent: Unique, count: Int): F[NonEmptyList[Unique]] = {
+            val newIds = newId.replicateA(count).map(NonEmptyList.fromListUnsafe)
+
+            newIds.flatTap { ids =>
+              val newCells = ids.map(SuiteHistory.Cell(_, SuiteHistory.Status.Pending))
+              SuiteHistory.replace[F](parent, newCells)
+            }
           }
-        } *> SuiteHistory.show
+
+          def publish(event: Event[Identifier]): F[Unit] = {
+            event match {
+              case Event.SuiteStarted(_, id)        => SuiteHistory.markRunning(id)
+              case Event.SuiteFinished(_, id, succ) => SuiteHistory.markFinished(id, succ)
+              case _                                => Applicative[F].unit
+            }
+          } *> SuiteHistory.show
+        }
       }
     }
+  }
 }
