@@ -135,10 +135,17 @@ object Reporter {
 
     //reference implementation, will be overridden for more performance (and possibly no fs2 dependency)
     def stringify: String = {
+      val failedSuites = cells.count(_.status === SuiteHistory.Status.Failed)
+
+      val failedSuiteCountOption = failedSuites.some.filter(_ > 0).map { failures =>
+        show"\n${Console.RED}[$failures failed]"
+      }
+
       fs2.Stream.emit(Console.RESET) ++
         cells.foldMap(fs2.Stream.emit(_)).groupAdjacentBy(_.status).map(_.map(_.size)).map {
           case (status, cellCount) => status.color ++ status.stringify.combineN(cellCount)
         } ++
+        fs2.Stream.emits(failedSuiteCountOption.toList) ++
         fs2.Stream.emit(Console.RESET)
     }.compile.string
   }
@@ -229,6 +236,7 @@ object Reporter {
     def show[F[_]: MState: FlatMap: ConsoleOut]: F[Unit] =
       MState[F].get.flatMap { result =>
         val clear = "\u001b[2J\u001b[H"
+
         //no `map` for laziness
         if (result.cells.exists(_.status === Status.Pending))
           ConsoleOut[F].putStrLn(clear ++ result.stringify)
