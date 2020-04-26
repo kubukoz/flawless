@@ -53,7 +53,7 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
 
         private val ident: M[Identifier] = MonadState[M, Int].modify(_ + 1) *> MonadState[M, Int].get
 
-        def createChildren(parent: Int, count: Int): M[NonEmptyList[Int]] =
+        def splitParent(parent: Int, count: Int): M[NonEmptyList[Int]] =
           logger.tell((LogEvent.ReplaceWith(parent, count): LogEvent).pure[S]) *> ident
             .replicateA(count)
             .map(NonEmptyList.fromListUnsafe)

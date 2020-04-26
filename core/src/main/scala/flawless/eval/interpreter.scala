@@ -90,7 +90,7 @@ object Interpreter {
 
             val suiteCount = s.suites.length
 
-            (reporter.createChildren(parentId, suiteCount): f[NonEmptyList[reporter.Identifier]])
+            (reporter.splitParent(parentId, suiteCount): f[NonEmptyList[reporter.Identifier]])
               .map((idents: NonEmptyList[reporter.Identifier]) => s.suites.zipWith(idents)((_, _)))
               .flatMap(interpretSuites)
               .map(Suite.sequence[f](_))
@@ -108,7 +108,9 @@ object Interpreter {
 trait Reporter[F[_]] {
   type Identifier
   def root: Identifier
-  def createChildren(parent: Identifier, count: Int): F[NonEmptyList[Identifier]]
+
+  // Replaces the parent identifier with [[count]] new identifiers.
+  def splitParent(parent: Identifier, count: Int): F[NonEmptyList[Identifier]]
   def publish(event: Reporter.Event[Identifier]): F[Unit]
 }
 
@@ -242,7 +244,7 @@ object Reporter {
 
       private val ident: F[Identifier] = identifiers.modify(a => (a + 1, a))
 
-      def createChildren(parent: Int, count: Int): F[NonEmptyList[Int]] = {
+      def splitParent(parent: Int, count: Int): F[NonEmptyList[Int]] = {
         val ids = ident.replicateA(count).map(NonEmptyList.fromListUnsafe)
 
         ids.flatTap { newIds =>
@@ -276,7 +278,7 @@ object Reporter {
           type Identifier = Unique
           val root: Unique = rootIdent
 
-          def createChildren(parent: Unique, count: Int): F[NonEmptyList[Unique]] = {
+          def splitParent(parent: Unique, count: Int): F[NonEmptyList[Unique]] = {
             val newIds = newId.replicateA(count).map(NonEmptyList.fromListUnsafe)
 
             newIds.flatTap { ids =>
