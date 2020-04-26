@@ -39,8 +39,9 @@ final class InterpreterReportingTest[F[_]: Sync] extends SuiteClass[F] {
       S[_]: Alternative
     ]: Reporter.Aux[M, Int] = new Reporter[M] {
       type Identifier = Int
+      val root: Int = 0
 
-      val ident: M[Identifier] = MonadState[M, Int].get <* MonadState[M, Int].modify(_ + 1)
+      val ident: M[Identifier] = MonadState[M, Int].modify(_ + 1) *> MonadState[M, Int].get
 
       def publish(event: Reporter.Event[Identifier]): M[Unit] =
         FunctorTell[M, S[Reporter.Event[Int]]].tell(event.pure[S])
