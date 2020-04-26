@@ -8,6 +8,7 @@ import flawless.TestApp
 import flawless.data.Suite
 
 //test runner for the whole module
+
 object FlawlessTests extends IOApp with TestApp {
 
   def run(args: List[String]): IO[ExitCode] =
@@ -23,7 +24,8 @@ object FlawlessTests extends IOApp with TestApp {
         new InterpreterReportingTest[IO].runSuite,
         tagless,
         new TaglessTestLocalResource[IO].runSuite,
-        HistoryStringifyTests.runSuite
+        HistoryStringifyTests.runSuite,
+        FlatReplaceFirstTests.runSuite
       )
     }
 }

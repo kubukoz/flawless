@@ -20,9 +20,8 @@ import cats.FlatMap
 import cats.MonadError
 import scala.util.control.NonFatal
 import monocle.macros.Lenses
-import scala.annotation.tailrec
 import cats.data.Chain
-import cats.data.Chain.==:
+import flawless.util.ChainUtils._
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -184,22 +183,6 @@ object Reporter {
     type MState[F[_]] = MonadState[F, SuiteHistory]
     def MState[F[_]](implicit F: MState[F]): MState[F] = F
 
-    /* private */
-    def flatReplaceFirst[A](f: PartialFunction[A, Chain[A]]): Chain[A] => Chain[A] = {
-
-      @tailrec
-      def go(list: Chain[A], memory: Chain[A]): Chain[A] = list match {
-        case Chain.nil => memory
-        case head ==: tail =>
-          f.lift(head) match {
-            case Some(elems) => memory ++ elems ++ tail
-            case None        => go(tail, memory append head)
-          }
-      }
-
-      go(_, Chain.nil)
-    }
-
     def replace[F[_]: MState](toRemove: Unique, cells: NonEmptyList[Cell]): F[Unit] =
       MState[F].modify(
         SuiteHistory
@@ -211,27 +194,22 @@ object Reporter {
           )
       )
 
-    def markRunning[F[_]: MState](id: Unique): F[Unit] = updateStatus[F] {
-      case Cell(`id`, SuiteHistory.Status.Pending) => SuiteHistory.Status.Running
-      case cell                                    => cell.status
+    def markRunning[F[_]: MState](id: Unique): F[Unit] =
+      setStatus(id, Status.Running)
+
+    def markFinished[F[_]: MState](id: Unique, succeeded: Boolean): F[Unit] = {
+      val newStatus = if (succeeded) SuiteHistory.Status.Succeeded else SuiteHistory.Status.Failed
+
+      setStatus(id, newStatus)
     }
 
-    def markFinished[F[_]: MState](id: Unique, succ: Boolean): F[Unit] = updateStatus[F] {
-      case Cell(`id`, SuiteHistory.Status.Running) =>
-        if (succ) SuiteHistory.Status.Succeeded else SuiteHistory.Status.Failed
-      case cell => cell.status
-    }
-
-    //sub-optimal map, could stop early
-    //todo rename to *firstStatus when changed
-    def updateStatus[F[_]: MState](update: Cell => Status): F[Unit] =
-      MState[F].modify { history =>
-        history.copy(
-          cells = history.cells.map { cell =>
-            SuiteHistory.Cell(cell.id, update(cell))
-          }
-        )
+    def setStatus[F[_]: MState](id: Unique, newStatus: Status): F[Unit] = MState[F].modify {
+      SuiteHistory.cells.modify {
+        flatReplaceFirst {
+          case cell if cell.id === id => Chain.one(cell.copy(status = newStatus))
+        }
       }
+    }
 
     def show[F[_]: MState: FlatMap: ConsoleOut]: F[Unit] =
       MState[F].get.flatMap { result =>

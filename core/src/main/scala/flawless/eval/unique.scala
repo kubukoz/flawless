@@ -1,6 +1,7 @@
 package flawless.eval
 
 import cats.Show
+import cats.kernel.Eq
 
 // inspired by christopherdavenport/unique
 
@@ -13,5 +14,6 @@ object unique {
 
   object Unique {
     implicit val show: Show[Unique] = Show.fromToString
+    implicit val eq: Eq[Unique] = Eq.fromUniversalEquals
   }
 }
