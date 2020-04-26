@@ -23,6 +23,8 @@ import scala.annotation.tailrec
 import cats.data.Chain
 import cats.data.NonEmptyList
 import cats.kernel.Eq
+import cats.mtl.MonadState
+import cats.Monad
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -267,8 +269,17 @@ trait Assert[F[_]] {
 
 object Assert {
 
-  def refInstance[F[_]: Applicative](ref: Ref[F, Assertion]): Assert[F] =
-    new Assert[F] {
-      def apply(assertion: Assertion): F[Unit] = ref.update(_ |+| assertion)
+  def refInstance[F[_]: Monad](ref: Ref[F, Assertion]): Assert[F] = {
+    import com.olegpy.meow.effects._
+
+    ref.runState { implicit S =>
+      monadStateInstance[F]
     }
+  }
+
+  def monadStateInstance[F[_]: MonadState[*[_], Assertion]]: Assert[F] =
+    new Assert[F] {
+      def apply(assertion: Assertion): F[Unit] = MonadState[F, Assertion].modify(_ |+| assertion)
+    }
+
 }

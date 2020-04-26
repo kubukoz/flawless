@@ -10,6 +10,7 @@ import cats.Show
 import cats.Eval
 import flawless.Predicate
 import cats.kernel.Eq
+import cats.mtl.instances.all._
 
 trait AllDsl {
 
@@ -34,6 +35,16 @@ trait AllDsl {
         }
         .flatMap(_.get)
     }
+
+  type AssertionState[A] = State[Assertion, A]
+
+  def pureTestMonadic(name: String)(f: Assert[AssertionState] => AssertionState[Unit]): NonEmptyList[Test[Nothing]] = {
+    val assertInstance = Assert.monadStateInstance[AssertionState]
+
+    pureTest(name) {
+      f(assertInstance).runS(Assertion.successful).value
+    }
+  }
 
   def pureTest(name: String)(assertions: Assertion): NonEmptyList[Test[Nothing]] =
     NonEmptyList.one(Test(name, TestRun.Pure(assertions)))
