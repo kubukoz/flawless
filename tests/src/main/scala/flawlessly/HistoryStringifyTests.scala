@@ -18,10 +18,10 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
   def yellow(s: String) = Console.YELLOW ++ s
   def clear(s: String) = Console.RESET ++ s
 
-  def fakeHistory(statuses: (Int, Status)*) =
+  def fakeHistory(statuses: Status.type => (Int, Status)*): SuiteHistory =
     SuiteHistory(
       Chain
-        .fromSeq(statuses)
+        .fromSeq(statuses.map(_(Status)))
         .flatMap {
           case (n, status) => Chain.fromSeq(List.fill(n)(status))
         }
@@ -38,15 +38,15 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
       },
       pureTest("stringify on a history") {
         val history = fakeHistory(
-          4 -> Status.Succeeded,
-          1 -> Status.Failed,
-          1 -> Status.Succeeded,
-          4 -> Status.Running,
-          1 -> Status.Pending,
-          1 -> Status.Succeeded,
-          2 -> Status.Pending,
-          1 -> Status.Succeeded,
-          2 -> Status.Pending
+          4 -> _.Succeeded,
+          1 -> _.Failed,
+          1 -> _.Succeeded,
+          4 -> _.Running,
+          1 -> _.Pending,
+          1 -> _.Succeeded,
+          2 -> _.Pending,
+          1 -> _.Succeeded,
+          2 -> _.Pending
         )
 
         val stringified =
@@ -68,8 +68,8 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
       },
       pureTest("stringify without failures") {
         val history = fakeHistory(
-          2 -> Status.Pending,
-          2 -> Status.Succeeded
+          2 -> _.Pending,
+          2 -> _.Succeeded
         )
 
         val stringified =
