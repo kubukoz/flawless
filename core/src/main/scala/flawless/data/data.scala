@@ -207,9 +207,7 @@ object Suite {
   /**
     * Semigroup instance that combines suites sequentially.
     */
-  implicit def suiteSemigroup[F[_]: Apply]: Semigroup[Suite[F]] = new Semigroup[Suite[F]] {
-    def combine(x: Suite[F], y: Suite[F]): Suite[F] = x.zip(y)
-  }
+  implicit def suiteSemigroup[F[_]: Apply]: Semigroup[Suite[F]] = _ zip _
 
   def renameEach[F[_]: FlatMap](modName: String => F[String]): Suite[F] => Suite[F] = {
     //todo what about stack safety in the case of tests in Id?
