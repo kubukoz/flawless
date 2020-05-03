@@ -5,6 +5,7 @@ import flawless.syntax._
 import flawless._
 import cats.implicits._
 import flawless.eval.Reporter
+import TestReporter.LogEvent
 import cats.effect.Resource
 import cats.Monad
 

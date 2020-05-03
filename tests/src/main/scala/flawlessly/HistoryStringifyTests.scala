@@ -31,7 +31,7 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
   val runSuite: Suite[NoEffect] = suite("HistoryStringifyTests") {
     tests(
       pureTest("stringify on a cell") {
-        ensureEqual(Status.Pending.stringify, "▫") |+|
+        ensureEqual(Status.Waiting.stringify, "▫") |+|
           ensureEqual(Status.Running.stringify, "◼") |+|
           ensureEqual(Status.Succeeded.stringify, "◼") |+|
           ensureEqual(Status.Failed.stringify, "◼")
@@ -42,11 +42,11 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
           1 -> _.Failed,
           1 -> _.Succeeded,
           4 -> _.Running,
-          1 -> _.Pending,
+          1 -> _.Waiting,
           1 -> _.Succeeded,
-          2 -> _.Pending,
+          2 -> _.Waiting,
           1 -> _.Succeeded,
-          2 -> _.Pending
+          2 -> _.Waiting
         )
 
         val stringified =
@@ -68,7 +68,7 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
       },
       pureTest("stringify without failures") {
         val history = fakeHistory(
-          2 -> _.Pending,
+          2 -> _.Waiting,
           2 -> _.Succeeded
         )
 

@@ -25,6 +25,7 @@ import cats.Show
 import cats.mtl.Tell
 import cats.effect.kernel.Ref
 import cats.effect.kernel.MonadCancel
+import flawless.data.Assertion.Result.Pending
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -54,11 +55,15 @@ object Assertion {
   val successful: Assertion = one(Result.Successful)
   def failed(message: String): Assertion = one(Result.Failed(message))
 
-  def thrown(e: Throwable): Assertion =
-    failed(
-      show"An unexpected ${e.getClass().getName()} was thrown: ${e
-        .getMessage()}\n${e.getStackTrace().map(_.toString).map("  at " + _).mkString("\n")}"
-    )
+  val pending: Assertion = one(Pending)
+
+  def thrown(e: Throwable): Assertion = {
+    val reason =
+      show"""An unexpected ${e.getClass().getName()} was thrown: ${e.getMessage()}
+            |${e.getStackTrace().map(_.toString).map("  at " + _).mkString("\n")}""".stripMargin
+
+    failed(reason)
+  }
 
   def one(result: Result): Assertion = One(result)
 
@@ -76,6 +81,7 @@ object Assertion {
   sealed trait Result extends Product with Serializable {
 
     def isSuccessful: Boolean = this match {
+      case Result.Pending    => false
       case Result.Failed(_)  => false
       case Result.Successful => true
     }
@@ -84,15 +90,18 @@ object Assertion {
 
   object Result {
     case object Successful extends Result
+    case object Pending extends Result
     final case class Failed(message: String) extends Result
 
     implicit val eq: Eq[Result] = Eq.by {
       case Successful      => true.asRight
+      case Pending         => false.asRight
       case Failed(message) => message.asLeft
     }
 
     implicit val show: Show[Result] = {
       case Successful      => "Successful"
+      case Pending         => "Pending"
       case Failed(message) => show"Failed($message)"
     }
 
@@ -219,9 +228,6 @@ object Suite {
 
   def suspend[F[_]](suites: F[Suite[F]]): Suite[F] = algebra.Suspend(suites)
 
-  def thrown(e: Throwable): Suite.algebra.One[flawless.NoEffect] =
-    algebra.One("failed", NonEmptyList.one(Test.thrown(e)))
-
   /** Semigroup instance that combines suites sequentially.
     */
   implicit def suiteSemigroup[F[_]: Apply]: Semigroup[Suite[F]] = _ zip _
@@ -260,14 +266,10 @@ object Suite {
 //todo rename result to run
 final case class Test[+F[_]](name: String, result: TestRun[F])
 
-object Test {
-  def thrown(e: Throwable): Test[flawless.NoEffect] = Test("failed", TestRun.Pure(Assertion.thrown(e)))
-}
-
 sealed trait TestRun[+F[_]] extends Product with Serializable {
 
   def assertions[F2[a] >: F[a]](implicit applicative: Applicative[F2]): F2[Assertion] = this match {
-    case TestRun.Eval(effect) => effect
+    case TestRun.Eval(effect) => effect.value
     case TestRun.Pure(result) => result.pure[F2]
     case TestRun.Lazy(result) => result.value.pure[F2]
   }
@@ -275,7 +277,7 @@ sealed trait TestRun[+F[_]] extends Product with Serializable {
 }
 
 object TestRun {
-  final case class Eval[F[_]](effect: F[Assertion]) extends TestRun[F]
+  final case class Eval[F[_]](effect: cats.Eval[F[Assertion]]) extends TestRun[F]
   final case class Pure(result: Assertion) extends TestRun[Nothing]
   final case class Lazy(result: cats.Eval[Assertion]) extends TestRun[Nothing]
 }

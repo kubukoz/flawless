@@ -7,8 +7,7 @@ import cats.implicits._
 import cats.data.State
 import cats.effect.kernel.Ref
 import cats.Functor
-import cats.FlatMap
-import cats.Monad
+import cats.effect.MonadThrow
 
 @finalAlg
 trait MyAlg[F[_]] {
@@ -32,7 +31,7 @@ object MyAlg {
 
 object TaglessTest {
 
-  def apply[F[_]: MyAlg: FlatMap: Ref.Make]: Suite[F] = suite("tagless") {
+  def apply[F[_]: MyAlg: MonadThrow: Ref.Make]: Suite[F] = suite("tagless") {
     tests(
       test("first tagless")(
         (MyAlg[F].reset *> MyAlg[F].hello, MyAlg[F].hello).mapN { (before, after) =>
@@ -55,7 +54,7 @@ object TaglessTest {
 
 object TaglessTestLocalResource {
 
-  def apply[F[_]: Ref.Make: Monad]: Suite[F] = Suite.suspend {
+  def apply[F[_]: Ref.Make: MonadThrow]: Suite[F] = Suite.suspend {
     MyAlg.refInstance[F].map { implicit alg =>
       TaglessTest[F].renameEach(_ => "tagless with local instance".pure[F])
     }

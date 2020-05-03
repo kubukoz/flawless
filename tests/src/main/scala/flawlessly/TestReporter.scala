@@ -16,14 +16,13 @@ import cats.mtl.Tell
 import cats.Alternative
 import cats.Monad
 import cats.data.ReaderWriterStateT
-import cats.effect.kernel.MonadCancel
+import flawlessly.TestReporter.LogEvent
 import cats.effect.MonadCancelThrow
+import cats.effect.kernel.MonadCancel
+import cats.Defer
 
 object TestReporter {
-  implicit def instance[F[_]: MonadCancelThrow]: TestReporter[F] = new TestReporter[F]
-}
-
-final class TestReporter[F[_]: MonadCancelThrow] {
+  implicit def instance[F[_]: MonadCancelThrow: Defer]: TestReporter[F] = new TestReporter[F]
   sealed trait LogEvent extends Product with Serializable
 
   object LogEvent {
@@ -32,9 +31,13 @@ final class TestReporter[F[_]: MonadCancelThrow] {
     implicit val show: Show[LogEvent] = Show.fromToString
   }
 
+}
+
+final class TestReporter[F[_]: MonadCancelThrow: Defer] {
+
   type WC[A] = ReaderWriterStateT[F, Unit, Chain[LogEvent], Int, A]
 
-  implicit val wcMonadCancel: MonadCancel[WC, Throwable] = MonadCancel.monadCancelForReaderWriterStateT
+  implicit val wcMonadCancel: MonadCancelThrow[WC] = MonadCancel.monadCancelForReaderWriterStateT
   //The instance shall not be used for parallelism! It's pretty much just a marker
   implicit val wcParallel: Parallel[WC] = Parallel.identity
 

@@ -20,8 +20,9 @@ object FlawlessTests extends IOApp with TestApp {
       }
 
       Suite.parallel(
-        GetStatsTest.runSuite,
+        RunStatsTest.runSuite,
         InterpreterReportingTest[IO],
+        InterpreterCatchingTest[IO],
         tagless,
         TaglessTestLocalResource[IO],
         HistoryStringifyTests.runSuite,

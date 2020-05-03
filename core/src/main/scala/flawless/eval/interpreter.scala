@@ -22,6 +22,8 @@ import cats.FlatMap
 import cats.Monad
 import cats.effect.kernel.Unique
 import cats.effect.MonadThrow
+import flawless.api.TODO
+import cats.Defer
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -35,20 +37,35 @@ object Interpreter {
   //A type alias for an action that interprets a single instance of Algebra (e.g. suite or test)
   type InterpretOne[Algebra[_[_]], F[_]] = Algebra[F] => F[Algebra[NoEffect]]
 
-  def defaultInterpreter[F[_]: MonadThrow]: Interpreter[F] =
+  private object catchers {
+
+    val catchTodo: PartialFunction[Throwable, Assertion] = { case TODO() =>
+      Assertion.pending
+    }
+
+    val catchNonFatalOnly: PartialFunction[Throwable, Assertion] = { case NonFatal(e) =>
+      Assertion.thrown(e)
+    }
+
+    val catchAll: Throwable => Assertion = Assertion.thrown
+  }
+
+  def defaultInterpreter[F[_]: MonadThrow: Defer]: Interpreter[F] =
     new Interpreter[F] {
+      import catchers._
 
       private def interpretTest(implicit reporter: Reporter[F]): InterpretOne[Test, F] = { test =>
         def finish(results: Assertion): Test[NoEffect] = Test(test.name, TestRun.Pure(results))
 
         val exec: F[Test[NoEffect]] = test.result match {
           //this is a GADT skolem - you think I'd know what that means by now...
-          case eval: TestRun.Eval[f] => eval.effect.handleError(Assertion.thrown(_)).map(finish)
+          case eval: TestRun.Eval[f] =>
+            Defer[f].defer(eval.effect.value).handleError(catchTodo.applyOrElse(_, catchAll)).map(finish)
           case TestRun.Pure(result)  => finish(result).pure[F]
           case TestRun.Lazy(e)       =>
             finish {
               try e.value
-              catch { case NonFatal(e) => (Assertion.thrown(e)) }
+              catch catchTodo.orElse(catchNonFatalOnly)
             }.pure[F]
         }
 
@@ -116,16 +133,16 @@ trait Reporter[F[_]] {
 object Reporter {
   type Aux[F[_], Ident] = Reporter[F] { type Identifier = Ident }
 
-  sealed trait Event[Identifier] extends Product with Serializable
+  sealed trait Event[+Identifier] extends Product with Serializable
 
   object Event {
-    final case class TestStarted[Identifier](name: String) extends Event[Identifier]
-    final case class TestFinished[Identifier](name: String) extends Event[Identifier]
+    final case class TestStarted(name: String) extends Event[Nothing]
+    final case class TestFinished(name: String) extends Event[Nothing]
     final case class SuiteStarted[Identifier](name: String, id: Identifier) extends Event[Identifier]
 
     final case class SuiteFinished[Identifier](name: String, id: Identifier, succeeded: Boolean) extends Event[Identifier]
 
-    implicit def eq[Identifier]: Eq[Event[Identifier]] = Eq.fromUniversalEquals
+    implicit def eq[Identifier: Eq]: Eq[Event[Identifier]] = Eq.fromUniversalEquals
   }
 
   final case class SuiteHistory(cells: Chain[SuiteHistory.Cell]) {
@@ -156,12 +173,12 @@ object Reporter {
       import Status._
 
       def stringify: String = this match {
-        case Status.Pending => "▫"
+        case Status.Waiting => "▫"
         case _              => "◼"
       }
 
       def color: String = this match {
-        case Pending   => scala.Console.RESET
+        case Waiting   => scala.Console.RESET
         case Running   => scala.Console.YELLOW
         case Succeeded => scala.Console.GREEN
         case Failed    => scala.Console.RED
@@ -170,7 +187,7 @@ object Reporter {
     }
 
     object Status {
-      case object Pending extends Status
+      case object Waiting extends Status
       case object Running extends Status
       case object Succeeded extends Status
       case object Failed extends Status
@@ -178,7 +195,7 @@ object Reporter {
       implicit val eq: Eq[Status] = Eq.fromUniversalEquals
     }
 
-    def initial(rootId: Unique.Token): SuiteHistory = SuiteHistory(Chain.one(Cell(rootId, Status.Pending)))
+    def initial(rootId: Unique.Token): SuiteHistory = SuiteHistory(Chain.one(Cell(rootId, Status.Waiting)))
 
     type MState[F[_]] = Stateful[F, SuiteHistory]
     def MState[F[_]](implicit F: MState[F]): MState[F] = F
@@ -187,7 +204,7 @@ object Reporter {
       MState[F].modify(
         _.lens(_.cells)
           .modify(
-            flatReplaceFirst { case Cell(`toRemove`, Status.Pending) =>
+            flatReplaceFirst { case Cell(`toRemove`, Status.Waiting) =>
               Chain.fromSeq(cells.toList)
             }
           )
@@ -210,13 +227,10 @@ object Reporter {
       }
     }
 
-    def show[F[_]: MState: FlatMap: Console]: F[Unit] = {
-      val clear = "\u001b[2J\u001b[H"
-
+    def show[F[_]: MState: FlatMap: Console]: F[Unit] =
       MState[F].get.flatMap { result =>
-        Console[F].println(clear ++ result.stringify)
+        Console[F].println(Constants.clear ++ result.stringify)
       }
-    }
 
   }
 
@@ -266,7 +280,7 @@ object Reporter {
             val newIds = newId.replicateA(count).map(NonEmptyList.fromListUnsafe)
 
             newIds.flatTap { ids =>
-              val newCells = ids.map(SuiteHistory.Cell(_, SuiteHistory.Status.Pending))
+              val newCells = ids.map(SuiteHistory.Cell(_, SuiteHistory.Status.Waiting))
               SuiteHistory.replace[F](parent, newCells)
             }
           }
