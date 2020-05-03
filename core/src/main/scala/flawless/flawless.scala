@@ -4,6 +4,7 @@ import cats.effect.ConsoleOut
 import flawless.data.Assertion
 import flawless.eval.Interpreter
 import flawless.eval.summarize
+import flawless.eval.toTerminalOutput
 import flawless.eval.loadArgs
 
 package object flawless {
@@ -34,5 +35,9 @@ package object flawless {
         case _                   => Reporter.consoleInstance[F]
       }
       .flatMap(Interpreter[F].interpret(_)(suites))
-      .flatMap(summarize[F](_))
+      .map(summarize)
+      .map(toTerminalOutput)
+      .flatMap(_.leftTraverse(ConsoleOut[F].putStrLn))
+      .map(_._2)
+
 }

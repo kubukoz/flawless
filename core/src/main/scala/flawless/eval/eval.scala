@@ -1,24 +1,20 @@
 package flawless
 
-import cats.effect.ConsoleOut
-import cats.FlatMap
 import cats.data.NonEmptyList
-import cats.data.NonEmptyChain
 import cats.effect.ExitCode
 import cats.Id
 import cats.implicits._
-import flawless.data.Test
 
 package object eval {
-  import flawless.data.Assertion
+  import flawless.data.Assertion.Result.Failed
 
   import cats.Applicative
 
-  def summarize[F[_]: ConsoleOut: FlatMap](suites: Suite[Id]): F[ExitCode] = {
+  //todo: show names of suites
+  def toTerminalOutput(output: Output): (String, ExitCode) = {
     import scala.io.AnsiColor
-    val suitesFlat = data.Suite.flatten(suites)
 
-    val stats = RunStats.fromSuites[NonEmptyList](suitesFlat)
+    val stats = output.stats
 
     val weGood = stats.suite.failed === 0
     val exit = if (weGood) ExitCode.Success else ExitCode.Error
@@ -28,25 +24,6 @@ package object eval {
 
     def inRed(s: String): String =
       AnsiColor.RED + s + AnsiColor.RESET
-
-    def inColor(test: Test[Id]): String = {
-      val results: NonEmptyChain[Assertion.Result] = test.result.assertions.flatMap(_.results)
-
-      val successful = results.forall(_.isSuccessful)
-      val testName =
-        if (successful) inGreen(show"Passed: ${test.name}")
-        else inRed(show"Failed: ${test.name}")
-
-      val failedAssertions: List[String] = results.toList.collect {
-        case Assertion.Result.Failed(failure) =>
-          inRed(
-            // show"${failure.text} (${failure.location})"
-            failure //todo
-          )
-      }
-
-      testName + (if (!successful) failedAssertions.mkString("\n", "\n", "\n") else "")
-    }
 
     val msg = {
       val successMessage = {
@@ -68,13 +45,48 @@ package object eval {
             |$failureMessage""".stripMargin
     }
 
-    val showSummary = ConsoleOut[F].putStrLn("============ TEST SUMMARY ============")
+    def inColor(test: Output.Test): String = test.problems match {
+      case Left(problems) => inRed(show"Failed: ${test.name}" ++ problems.mkString_("\n", "\n", "\n"))
+      case Right(_)       => inGreen(show"Passed: ${test.name}")
+    }
 
-    val showResults = suitesFlat.flatMap(_.tests).map(inColor).nonEmptyTraverse_(ConsoleOut[F].putStrLn)
+    val results =
+      output.suites.flatMap(_.tests).map(inColor).mkString_("\n", "\n", "\n")
 
-    showResults *>
-      showSummary *>
-      ConsoleOut[F].putStrLn(msg).as(exit)
+    val outputString =
+      show"""$results
+            |============ TEST SUMMARY ============
+            |$msg
+            |""".stripMargin
+
+    (outputString, exit)
+  }
+
+  def summarize(suites: Suite[Id]): Output = {
+    val suitesFlat = data.Suite.flatten(suites)
+
+    val stats = RunStats.fromSuites[NonEmptyList](suitesFlat)
+
+    val suiteOutputs = suitesFlat.map(convertSuite)
+
+    Output(stats, suiteOutputs)
+  }
+
+  private def convertSuite(suite: Suite.algebra.One[Id]): Output.Suite = {
+    val testOutputs = suite.tests.map { test =>
+      val problems = test
+        .result
+        .assertions
+        .results
+        .collect {
+          case Failed(message) => message
+        }
+        .toList
+
+      Output.Test(test.name, problems.toNel.toLeft(()))
+    }
+
+    Output.Suite(suite.name, testOutputs)
   }
 
   def loadArgs[F[_]: Applicative](args: List[String]): F[Settings] = {
