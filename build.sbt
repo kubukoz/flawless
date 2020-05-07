@@ -15,15 +15,15 @@ inThisBuild(
 )
 
 val compilerPlugins = List(
-  compilerPlugin("org.scalamacros" % "paradise" % "2.1.1").cross(CrossVersion.full),
   compilerPlugin("org.typelevel" % "kind-projector" % "0.11.0").cross(CrossVersion.full),
   compilerPlugin("com.kubukoz" % "better-tostring" % "0.2.2").cross(CrossVersion.full),
   compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 )
 
 val commonSettings = Seq(
-  scalaVersion := "2.12.11",
+  scalaVersion := "2.13.2",
   name := "flawless",
+  scalacOptions += "-Ymacro-annotations",
   scalacOptions -= "-Xfatal-warnings",
   libraryDependencies ++= List(
     "co.fs2" %% "fs2-core" % "2.3.0",
