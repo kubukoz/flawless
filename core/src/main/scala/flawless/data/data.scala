@@ -43,6 +43,11 @@ sealed trait Assertion extends Product with Serializable {
     // If this ever throws - there's a bug in flawless.
     NonEmptyChain.fromChainUnsafe(go(List(this), Chain.nil))
   }
+
+  override def equals(obj: Any): Boolean = obj match {
+    case another: Assertion => this === another
+    case _                  => false
+  }
 }
 
 object Assertion {
