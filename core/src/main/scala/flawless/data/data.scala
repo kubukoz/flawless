@@ -25,6 +25,7 @@ import cats.data.NonEmptyList
 import cats.kernel.Eq
 import cats.mtl.MonadState
 import cats.Monad
+import cats.Show
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -78,6 +79,16 @@ object Assertion {
   object Result {
     case object Successful extends Result
     final case class Failed(message: String) extends Result
+
+    implicit val eq: Eq[Result] = Eq.by {
+      case Successful      => true.asRight
+      case Failed(message) => message.asLeft
+    }
+
+    implicit val show: Show[Result] = {
+      case Successful      => "Successful"
+      case Failed(message) => show"Failed($message)"
+    }
   }
 
   final case class One(result: Result) extends Assertion
@@ -86,6 +97,13 @@ object Assertion {
   implicit val assertionMonoid: Monoid[Assertion] = new Monoid[Assertion] {
     def combine(x: Assertion, y: Assertion): Assertion = all(NonEmptyChain(x, y))
     val empty: Assertion = successful
+  }
+
+  implicit val eq: Eq[Assertion] = Eq.by(_.results)
+
+  implicit val show: Show[Assertion] = {
+    case One(result)     => show"Assertion.One(${result})"
+    case All(assertions) => show"Assertion.All(${assertions})"
   }
 }
 
