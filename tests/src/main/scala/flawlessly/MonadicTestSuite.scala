@@ -9,7 +9,7 @@ import cats.data.NonEmptyList
 
 object MonadicTestSuite {
 
-  def runSuite[F[_]: Sync]: Suite[F] = suite("MonadicTestSuite") {
+  def apply[F[_]: Sync]: Suite[F] = suite("MonadicTestSuite") {
 
     tests(
       test("monadic tests fail when no assertions are given") {
