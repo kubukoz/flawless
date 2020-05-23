@@ -25,7 +25,8 @@ object FlawlessTests extends IOApp with TestApp {
         tagless,
         new TaglessTestLocalResource[IO].runSuite,
         HistoryStringifyTests.runSuite,
-        FlatReplaceFirstTests.runSuite
+        FlatReplaceFirstTests.runSuite,
+        MonadicTestSuite.runSuite[IO]
       )
     }
 }

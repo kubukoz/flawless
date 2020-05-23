@@ -6,6 +6,7 @@ import flawless.eval.Interpreter
 import flawless.eval.summarize
 import flawless.eval.toTerminalOutput
 import flawless.eval.loadArgs
+import cats.Functor
 
 package object flawless {
 
@@ -22,7 +23,28 @@ package object flawless {
   // This name is bad (Predicate implies A => Boolean). Come up with a better name.
   // Possibly worth newtyping.
   // This idea is heavily inspired by ZIO Test.
-  type Predicate[-A] = A => Assertion
+  final case class PredicateT[F[_], -A](private val fun: A => F[Assertion]) extends AnyVal {
+    def apply(a: A): F[Assertion] = fun(a)
+
+    def contramap[B](f: B => A): PredicateT[F, B] = PredicateT(fun.compose(f))
+  }
+
+  object PredicateT {
+    def const(result: Assertion): Predicate[Any] = liftF[cats.Id](result)
+    def liftF[F[_]](resultF: F[Assertion]): PredicateT[F, Any] = PredicateT(_ => resultF)
+
+    implicit class PredicateTExtensions[F[_], A](private val predicate: PredicateT[F, A]) {
+
+      def liftM[G[_]](implicit G: Functor[G], isId: F[Assertion] <:< Assertion): PredicateT[G, G[A]] =
+        PredicateT(_.map((predicate.apply _).andThen(isId)))
+    }
+  }
+
+  type Predicate[A] = PredicateT[cats.Id, A]
+
+  object Predicate {
+    def apply[A](f: A => Assertion): Predicate[A] = PredicateT[cats.Id, A](f)
+  }
 
   object syntax extends api.AllDsl with api.AllPredicates
   object dsl extends api.AllDsl

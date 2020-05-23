@@ -267,7 +267,7 @@ trait Assert[F[_]] {
 
 object Assert {
 
-  def refInstance[F[_]: Monad](ref: Ref[F, Assertion]): Assert[F] = {
+  def refInstance[F[_]: Monad](ref: Ref[F, Option[Assertion]]): Assert[F] = {
     import com.olegpy.meow.effects._
 
     ref.runState { implicit S =>
@@ -275,9 +275,6 @@ object Assert {
     }
   }
 
-  def monadStateInstance[F[_]: MonadState[*[_], Assertion]]: Assert[F] =
-    new Assert[F] {
-      def apply(assertion: Assertion): F[Unit] = MonadState[F, Assertion].modify(_ |+| assertion)
-    }
-
+  def monadStateInstance[F[_]: MonadState[*[_], Option[Assertion]]]: Assert[F] =
+    assertion => MonadState[F, Option[Assertion]].modify(_ |+| assertion.some)
 }
