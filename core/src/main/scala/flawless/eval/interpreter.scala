@@ -215,10 +215,20 @@ object Reporter {
       MState[F].get.flatMap { result =>
         val clear = "\u001b[2J\u001b[H"
 
-        //no `map` for laziness
-        if (result.cells.exists(_.status === Status.Pending))
-          ConsoleOut[F].putStrLn(clear ++ result.stringify)
-        else ConsoleOut[F].putStrLn(clear ++ "Finished")
+        //todo: read version
+        val header = "Flawless 0.1.0 👌"
+
+        val content =
+          //no `map` for laziness
+          if (result.cells.exists(_.status === Status.Pending))
+            result.stringify
+          else "Finished"
+
+        ConsoleOut[F].putStrLn(
+          show"""$clear$header
+                |
+                |$content""".stripMargin
+        )
       }
   }
 
