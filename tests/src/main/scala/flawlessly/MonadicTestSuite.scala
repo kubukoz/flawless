@@ -6,21 +6,29 @@ import cats.effect.Sync
 import cats.Applicative
 import flawless.data.Assertion
 import cats.data.NonEmptyList
+import flawless.data.Test
+import cats.data.State
 
 object MonadicTestSuite {
 
   def apply[F[_]: Sync]: Suite[F] = suite("MonadicTestSuite") {
 
+    val failedDueToAssertions: PredicateT[F, Test[F]] =
+      select((_: Test[F]).result.assertions[F])(
+        equalTo(Assertion.failed("No assertions were made!")).liftM[F]
+      )
+
     tests(
       test("monadic tests fail when no assertions are given") {
-        Sync[F].suspend {
-          //todo: tests shouldn't return lists anymore... I know, free monoid :(
-          val NonEmptyList(theTest, _) = testMonadic[F]("demo")(_ => Applicative[F].unit)
+        //todo: tests shouldn't return lists anymore... I know, free monoid :(
+        val NonEmptyList(theTest, _) = testMonadic[F]("demo")(_ => Applicative[F].unit)
 
-          ensureM(theTest.result.assertions)(
-            equalToEq(Assertion.failed("No assertions were made!"))
-          )
-        }
+        ensure(theTest, failedDueToAssertions)
+      },
+      test("monadic (state) tests fail when no assertions are given") {
+        val NonEmptyList(theTest, _) = pureTestMonadic("demo")(_ => State.pure(()))
+
+        ensure(theTest, failedDueToAssertions)
       }
     )
   }
