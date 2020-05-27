@@ -14,7 +14,7 @@ object MonadicTestSuite {
   def apply[F[_]: Sync]: Suite[F] = suite("MonadicTestSuite") {
 
     val failedDueToAssertions: PredicateT[F, Test[F]] =
-      select((_: Test[F]).result.assertions[F])(
+      select[Test[F]](_.result.assertions[F])(
         equalTo(Assertion.failed("No assertions were made!")).liftM[F]
       )
 

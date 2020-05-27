@@ -71,7 +71,7 @@ final class TestReporter[F[_]: Sync] {
 
   //todo naming
   def reportedWith[G[_]: Foldable](writtenPredicate: Predicate[List[LogEvent]]): PredicateT[F, Suite[WC]] =
-    select((a: Suite[WC]) => interpreter.interpret(reporter)(a).written.runA((), 0).map(_.toList))(
+    select[Suite[WC]](interpreter.interpret(reporter)(_).written.runA((), 0).map(_.toList))(
       writtenPredicate.liftM[F]
     )
 

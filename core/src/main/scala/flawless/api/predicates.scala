@@ -33,7 +33,7 @@ trait AllPredicates {
     case actual                        => Assertion.failed(show"$actual (actual) wasn't equal to $expected (expected).")
   }
 
-  def select[A, B, F[_]](f: A => B)(predicate: PredicateT[F, B]): PredicateT[F, A] = predicate.contramap(f)
+  def select[A]: SelectPartiallyApplied[A] = new SelectPartiallyApplied[A](false)
 
   val successful: Predicate[Any] = PredicateT.const(Assertion.successful)
   def failed(message: String): Predicate[Any] = PredicateT.const(Assertion.failed(message))
@@ -42,4 +42,8 @@ trait AllPredicates {
     case true  => Assertion.successful
     case false => Assertion.failed(ifFalse)
   }
+}
+
+final class SelectPartiallyApplied[A] private[api] (private val dummy: Boolean) extends AnyVal {
+  def apply[B, F[_]](f: A => B)(predicate: PredicateT[F, B]): PredicateT[F, A] = predicate.contramap(f)
 }
