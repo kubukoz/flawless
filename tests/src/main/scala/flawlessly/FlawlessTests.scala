@@ -15,17 +15,18 @@ object FlawlessTests extends IOApp with TestApp {
     runTests[IO](args) {
       val tagless = Suite.suspend {
         MyAlg.syncInstance[IO].map { implicit alg =>
-          new TaglessTest[IO].runSuite
+          TaglessTest[IO]
         }
       }
 
       Suite.parallel(
         GetStatsTest.runSuite,
-        new InterpreterReportingTest[IO].runSuite,
+        InterpreterReportingTest[IO],
         tagless,
-        new TaglessTestLocalResource[IO].runSuite,
+        TaglessTestLocalResource[IO],
         HistoryStringifyTests.runSuite,
-        FlatReplaceFirstTests.runSuite
+        FlatReplaceFirstTests.runSuite,
+        MonadicTestSuite[IO]
       )
     }
 }

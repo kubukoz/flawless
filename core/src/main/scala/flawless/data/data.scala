@@ -23,8 +23,8 @@ import scala.annotation.tailrec
 import cats.data.Chain
 import cats.data.NonEmptyList
 import cats.kernel.Eq
-import cats.mtl.MonadState
-import cats.Monad
+import cats.Show
+import cats.mtl.FunctorTell
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -41,6 +41,11 @@ sealed trait Assertion extends Product with Serializable {
     // Nil could only ever be returned if no assertions were provided, and we start with `this`, so there's always one.
     // If this ever throws - there's a bug in flawless.
     NonEmptyChain.fromChainUnsafe(go(List(this), Chain.nil))
+  }
+
+  override def equals(obj: Any): Boolean = obj match {
+    case another: Assertion => this === another
+    case _                  => false
   }
 }
 
@@ -78,6 +83,16 @@ object Assertion {
   object Result {
     case object Successful extends Result
     final case class Failed(message: String) extends Result
+
+    implicit val eq: Eq[Result] = Eq.by {
+      case Successful      => true.asRight
+      case Failed(message) => message.asLeft
+    }
+
+    implicit val show: Show[Result] = {
+      case Successful      => "Successful"
+      case Failed(message) => show"Failed($message)"
+    }
   }
 
   final case class One(result: Result) extends Assertion
@@ -86,6 +101,13 @@ object Assertion {
   implicit val assertionMonoid: Monoid[Assertion] = new Monoid[Assertion] {
     def combine(x: Assertion, y: Assertion): Assertion = all(NonEmptyChain(x, y))
     val empty: Assertion = successful
+  }
+
+  implicit val eq: Eq[Assertion] = Eq.by(_.results)
+
+  implicit val show: Show[Assertion] = {
+    case One(result)     => show"Assertion.One(${result})"
+    case All(assertions) => show"Assertion.All(${assertions})"
   }
 }
 
@@ -267,17 +289,14 @@ trait Assert[F[_]] {
 
 object Assert {
 
-  def refInstance[F[_]: Monad](ref: Ref[F, Assertion]): Assert[F] = {
+  def refInstance[F[_]: Functor](ref: Ref[F, Option[Assertion]]): Assert[F] = {
     import com.olegpy.meow.effects._
 
-    ref.runState { implicit S =>
-      monadStateInstance[F]
+    ref.runTell { implicit S =>
+      functorTellInstance[F]
     }
   }
 
-  def monadStateInstance[F[_]: MonadState[*[_], Assertion]]: Assert[F] =
-    new Assert[F] {
-      def apply(assertion: Assertion): F[Unit] = MonadState[F, Assertion].modify(_ |+| assertion)
-    }
-
+  def functorTellInstance[F[_]: FunctorTell[*[_], Option[Assertion]]]: Assert[F] =
+    assertion => FunctorTell[F, Option[Assertion]].tell(assertion.some)
 }

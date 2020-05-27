@@ -27,9 +27,9 @@ object MyAlg {
   }
 }
 
-final class TaglessTest[F[_]: MyAlg: Sync] extends SuiteClass[F] {
+object TaglessTest {
 
-  val runSuite: Suite[F] = suite("tagless") {
+  def apply[F[_]: MyAlg: Sync]: Suite[F] = suite("tagless") {
     tests(
       test("first tagless")(
         (MyAlg[F].reset *> MyAlg[F].hello, MyAlg[F].hello).mapN { (before, after) =>
@@ -49,11 +49,11 @@ final class TaglessTest[F[_]: MyAlg: Sync] extends SuiteClass[F] {
   }
 }
 
-final class TaglessTestLocalResource[F[_]: Sync] extends SuiteClass[F] {
+object TaglessTestLocalResource {
 
-  val runSuite: Suite[F] = Suite.suspend {
+  def apply[F[_]: Sync]: Suite[F] = Suite.suspend {
     MyAlg.syncInstance[F].map { implicit alg =>
-      new TaglessTest[F].runSuite.renameEach(_ => "tagless with local instance".pure[F])
+      TaglessTest[F].renameEach(_ => "tagless with local instance".pure[F])
     }
   }
 }

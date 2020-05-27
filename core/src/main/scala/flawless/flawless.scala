@@ -19,10 +19,11 @@ package object flawless {
   type Suite[+F[_]] = flawless.data.Suite[F]
   val Suite = flawless.data.Suite
 
-  // This name is bad (Predicate implies A => Boolean). Come up with a better name.
-  // Possibly worth newtyping.
-  // This idea is heavily inspired by ZIO Test.
-  type Predicate[-A] = A => Assertion
+  type Predicate[A] = PredicateT[cats.Id, A]
+
+  object Predicate {
+    def apply[A](f: A => Assertion): Predicate[A] = PredicateT[cats.Id, A](f)
+  }
 
   object syntax extends api.AllDsl with api.AllPredicates
   object dsl extends api.AllDsl

@@ -284,4 +284,11 @@ object Reporter {
       }
     }
   }
+
+  def noop[F[_]: Applicative]: Reporter[F] = new Reporter[F] {
+    type Identifier = Unit
+    val root: Identifier = ()
+    def splitParent(parent: Identifier, count: Int): F[NonEmptyList[Identifier]] = ().pure[NonEmptyList].pure[F]
+    def publish(event: Event[Identifier]): F[Unit] = Applicative[F].unit
+  }
 }
