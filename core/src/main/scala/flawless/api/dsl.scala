@@ -40,13 +40,13 @@ trait AllDsl {
         .map(_.getOrElse(Assertion.failed("No assertions were made!")))
     }
 
-  type AssertionState[A] = State[Option[Assertion], A]
+  type AssertionState[A] = Writer[Option[Assertion], A]
 
   def pureTestMonadic(name: String)(f: Assert[AssertionState] => AssertionState[Unit]): NonEmptyList[Test[Nothing]] = {
-    val assertInstance = Assert.monadStateInstance[AssertionState]
+    val assertInstance = Assert.functorTellInstance[AssertionState]
 
     pureTest(name) {
-      f(assertInstance).runS(none).map(_.getOrElse(Assertion.failed("No assertions were made!"))).value
+      f(assertInstance).written.getOrElse(Assertion.failed("No assertions were made!"))
     }
   }
 

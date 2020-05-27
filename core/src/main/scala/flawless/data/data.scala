@@ -23,9 +23,8 @@ import scala.annotation.tailrec
 import cats.data.Chain
 import cats.data.NonEmptyList
 import cats.kernel.Eq
-import cats.mtl.MonadState
-import cats.Monad
 import cats.Show
+import cats.mtl.FunctorTell
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -290,14 +289,14 @@ trait Assert[F[_]] {
 
 object Assert {
 
-  def refInstance[F[_]: Monad](ref: Ref[F, Option[Assertion]]): Assert[F] = {
+  def refInstance[F[_]: Functor](ref: Ref[F, Option[Assertion]]): Assert[F] = {
     import com.olegpy.meow.effects._
 
-    ref.runState { implicit S =>
-      monadStateInstance[F]
+    ref.runTell { implicit S =>
+      functorTellInstance[F]
     }
   }
 
-  def monadStateInstance[F[_]: MonadState[*[_], Option[Assertion]]]: Assert[F] =
-    assertion => MonadState[F, Option[Assertion]].modify(_ |+| assertion.some)
+  def functorTellInstance[F[_]: FunctorTell[*[_], Option[Assertion]]]: Assert[F] =
+    assertion => FunctorTell[F, Option[Assertion]].tell(assertion.some)
 }
