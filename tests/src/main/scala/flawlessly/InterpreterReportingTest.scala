@@ -11,7 +11,7 @@ import cats.Monad
 //Sync, because Bracket for WriterT isn't explicitly written
 object InterpreterReportingTest {
 
-  def apply[F[_]: Monad](testReporter: TestReporter[F]): Suite[F] = {
+  def apply[F[_]: Monad](implicit testReporter: TestReporter[F]): Suite[F] = {
     import testReporter._
 
     val simpleSuite = suite[WC]("suite 1") {

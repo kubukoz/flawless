@@ -21,7 +21,7 @@ object FlawlessTests extends IOApp with TestApp {
 
       Suite.parallel(
         GetStatsTest.runSuite,
-        TestReporter.provide(InterpreterReportingTest[IO]),
+        InterpreterReportingTest[IO],
         tagless,
         TaglessTestLocalResource[IO],
         HistoryStringifyTests.runSuite,

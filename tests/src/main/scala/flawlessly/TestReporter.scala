@@ -21,7 +21,7 @@ import cats.data.ReaderWriterStateT
 import cats.effect.Bracket
 
 object TestReporter {
-  def provide[F[_]: Sync, A](f: TestReporter[F] => Suite[F]): Suite[F] = f(new TestReporter[F])
+  implicit def instance[F[_]: Sync]: TestReporter[F] = new TestReporter[F]
 }
 
 final class TestReporter[F[_]: Sync] {
@@ -67,7 +67,12 @@ final class TestReporter[F[_]: Sync] {
   val interpreter: Interpreter[WC] = Interpreter.defaultInterpreter[WC]
 
   def reported[G[_]: Foldable](expectedWritten: G[LogEvent]): PredicateT[F, Suite[WC]] =
+    reportedWith[G](equalTo(expectedWritten.toList))
+
+  //todo naming
+  def reportedWith[G[_]: Foldable](writtenPredicate: Predicate[List[LogEvent]]): PredicateT[F, Suite[WC]] =
     select((a: Suite[WC]) => interpreter.interpret(reporter)(a).written.runA((), 0).map(_.toList))(
-      equalTo(expectedWritten.toList).liftM[F]
+      writtenPredicate.liftM[F]
     )
+
 }
