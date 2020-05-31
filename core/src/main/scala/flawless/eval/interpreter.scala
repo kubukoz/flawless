@@ -16,12 +16,12 @@ import cats.kernel.Eq
 import cats.effect.Sync
 import cats.Applicative
 import cats.effect.concurrent.Ref
-import cats.FlatMap
 import cats.MonadError
 import scala.util.control.NonFatal
 import monocle.macros.Lenses
 import cats.data.Chain
 import flawless.util.ChainUtils._
+import cats.FlatMap
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -132,7 +132,7 @@ object Reporter {
   @Lenses
   final case class SuiteHistory(cells: Chain[SuiteHistory.Cell]) {
 
-    //reference implementation, will be overridden for more performance (and possibly no fs2 dependency)
+    //reference implementation, will be overridden for more performance (and possibly no fs2 dependency in eval)
     def stringify: String = {
       val failedSuites = cells.count(_.status === SuiteHistory.Status.Failed)
 
@@ -211,15 +211,13 @@ object Reporter {
       }
     }
 
-    def show[F[_]: MState: FlatMap: ConsoleOut]: F[Unit] =
-      MState[F].get.flatMap { result =>
-        val clear = "\u001b[2J\u001b[H"
+    def show[F[_]: MState: FlatMap: ConsoleOut]: F[Unit] = {
+      val clear = "\u001b[2J\u001b[H"
 
-        //no `map` for laziness
-        if (result.cells.exists(_.status === Status.Pending))
-          ConsoleOut[F].putStrLn(clear ++ result.stringify)
-        else ConsoleOut[F].putStrLn(clear ++ "Finished")
+      MState[F].get.flatMap { result =>
+        ConsoleOut[F].putStrLn(clear ++ result.stringify)
       }
+    }
   }
 
   def consoleInstance[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = Ref[F].of(0).map { identifiers =>
