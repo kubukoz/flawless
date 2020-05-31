@@ -51,11 +51,16 @@ package object eval {
     }
 
     val results =
-      output.suites.flatMap(_.tests).map(inColor).mkString_("\n", "\n", "\n")
+      output
+        .suites
+        .flatMap { suite =>
+          suite.name ::
+            (suite.tests.map(inColor) :+ "")
+        }
+        .mkString_("\n", "\n", "\n")
 
     val outputString =
-      show"""$results
-            |============ TEST SUMMARY ============
+      show"""$results============ TEST SUMMARY ============
             |$msg
             |""".stripMargin
 
