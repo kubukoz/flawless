@@ -27,8 +27,8 @@ val commonSettings = Seq(
   scalacOptions -= "-Xfatal-warnings",
   libraryDependencies ++= List(
     "co.fs2" %% "fs2-core" % "2.4.2",
-    "com.olegpy" %% "meow-mtl-effects" % "0.4.0",
-    "com.olegpy" %% "meow-mtl-core" % "0.4.0",
+    "com.olegpy" %% "meow-mtl-effects" % "0.4.1",
+    "com.olegpy" %% "meow-mtl-core" % "0.4.1",
     "org.typelevel" %% "cats-tagless-macros" % "0.11",
     "com.github.julien-truffaut" %% "monocle" % "2.0.3",
     "org.typelevel" %% "cats-effect" % "2.1.4",
