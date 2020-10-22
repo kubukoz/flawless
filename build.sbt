@@ -29,7 +29,7 @@ val commonSettings = Seq(
     "co.fs2" %% "fs2-core" % "2.4.4",
     "com.olegpy" %% "meow-mtl-effects" % "0.4.1",
     "com.olegpy" %% "meow-mtl-core" % "0.4.1",
-    "org.typelevel" %% "cats-tagless-macros" % "0.11",
+    "org.typelevel" %% "cats-tagless-macros" % "0.12",
     "com.github.julien-truffaut" %% "monocle" % "2.0.3",
     "org.typelevel" %% "cats-effect" % "2.2.0",
     "dev.profunktor" %% "console4cats" % "0.8.1",
