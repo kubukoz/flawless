@@ -12,9 +12,8 @@ import cats.effect.Sync
 import cats.Foldable
 import cats.data.NonEmptyList
 import cats.Parallel
-import cats.mtl.MonadState
-import cats.mtl.FunctorTell
-import cats.mtl.instances.all._
+import cats.mtl.Stateful
+import cats.mtl.Tell
 import cats.Alternative
 import cats.Monad
 import cats.data.ReaderWriterStateT
@@ -40,17 +39,14 @@ final class TestReporter[F[_]: Sync] {
   implicit val wcParallel: Parallel[WC] = Parallel.identity
 
   val reporter: Reporter.Aux[WC, Int] = {
-    def make[
-      M[_]: MonadState[*[_], Int]: Monad: FunctorTell[*[_], S[LogEvent]],
-      S[_]: Alternative
-    ]: Reporter.Aux[M, Int] =
+    def make[M[_]: Stateful[*[_], Int]: Monad: Tell[*[_], S[LogEvent]], S[_]: Alternative]: Reporter.Aux[M, Int] =
       new Reporter[M] {
         type Identifier = Int
         val root: Int = 0
 
-        private val logger = FunctorTell[M, S[LogEvent]]
+        private val logger = Tell[M, S[LogEvent]]
 
-        private val ident: M[Identifier] = MonadState[M, Int].modify(_ + 1) *> MonadState[M, Int].get
+        private val ident: M[Identifier] = Stateful[M, Int].modify(_ + 1) *> Stateful[M, Int].get
 
         def splitParent(parent: Int, count: Int): M[NonEmptyList[Int]] =
           logger.tell((LogEvent.ReplaceWith(parent, count): LogEvent).pure[S]) *> ident

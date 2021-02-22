@@ -10,7 +10,7 @@ import Interpreter.InterpretOne
 import flawless.data.Suite
 import flawless.NoEffect
 import cats.data.NonEmptyList
-import cats.mtl.MonadState
+import cats.mtl.Stateful
 import flawless.eval.unique.Unique
 import cats.kernel.Eq
 import cats.effect.Sync
@@ -22,12 +22,12 @@ import monocle.macros.Lenses
 import cats.data.Chain
 import flawless.util.ChainUtils._
 import cats.FlatMap
+import cats.Monad
 
 @finalAlg
 trait Interpreter[F[_]] {
 
-  /**
-    * Interprets the test structure to the underlying effect. This is where all the actual execution happens.
+  /** Interprets the test structure to the underlying effect. This is where all the actual execution happens.
     */
   def interpret(reporter: Reporter[F]): InterpretOne[Suite, F]
 }
@@ -46,7 +46,7 @@ object Interpreter {
           //this is a GADT skolem - you think I'd know what that means by now...
           case eval: TestRun.Eval[f] => eval.effect.handleError(Assertion.thrown(_)).map(finish)
           case TestRun.Pure(result)  => finish(result).pure[F]
-          case TestRun.Lazy(e) =>
+          case TestRun.Lazy(e)       =>
             finish {
               try e.value
               catch { case NonFatal(e) => (Assertion.thrown(e)) }
@@ -58,30 +58,29 @@ object Interpreter {
           reporter.publish(Reporter.Event.TestFinished(test.name))
       }
 
-      private def interpretSuite(reporter: Reporter[F])(id: reporter.Identifier): InterpretOne[Suite.algebra.One, F] = {
-        suite =>
-          def finish(results: NonEmptyList[Test[NoEffect]]): Suite.algebra.One[NoEffect] =
-            Suite.algebra.One(suite.name, results)
+      private def interpretSuite(reporter: Reporter[F])(id: reporter.Identifier): InterpretOne[Suite.algebra.One, F] = { suite =>
+        def finish(results: NonEmptyList[Test[NoEffect]]): Suite.algebra.One[NoEffect] =
+          Suite.algebra.One(suite.name, results)
 
-          reporter.publish(Reporter.Event.SuiteStarted(suite.name, id)) *>
-            suite.tests.nonEmptyTraverse(interpretTest(reporter).apply(_)).map(finish).flatTap { suiteResult =>
-              //todo duplicated logic!!!!
-              val isSuccessful =
-                suiteResult
-                  .tests
-                  .map(_.result.assertions[cats.Id])
-                  .flatMap(_.results.toNonEmptyList)
-                  .forall(_.isSuccessful)
+        reporter.publish(Reporter.Event.SuiteStarted(suite.name, id)) *>
+          suite.tests.nonEmptyTraverse(interpretTest(reporter).apply(_)).map(finish).flatTap { suiteResult =>
+            //todo duplicated logic!!!!
+            val isSuccessful =
+              suiteResult
+                .tests
+                .map(_.result.assertions[cats.Id])
+                .flatMap(_.results.toNonEmptyList)
+                .forall(_.isSuccessful)
 
-              reporter.publish(Reporter.Event.SuiteFinished(suite.name, id, isSuccessful))
-            }
+            reporter.publish(Reporter.Event.SuiteFinished(suite.name, id, isSuccessful))
+          }
       }
 
       import Suite.algebra._
 
       def interpret(reporter: Reporter[F]): InterpretOne[Suite, F] = {
         def interpretOne(parentId: reporter.Identifier): InterpretOne[Suite, F] = {
-          case s: Sequence[f] =>
+          case s: Sequence[f]  =>
             type IdentifiedSuites = NonEmptyList[(Suite[f], reporter.Identifier)]
 
             val interpretSuites: IdentifiedSuites => f[NonEmptyList[Suite[NoEffect]]] =
@@ -100,7 +99,9 @@ object Interpreter {
 
         interpretOne(reporter.root)
       }
+
     }
+
 }
 
 @finalAlg
@@ -123,8 +124,7 @@ object Reporter {
     final case class TestFinished[Identifier](name: String) extends Event[Identifier]
     final case class SuiteStarted[Identifier](name: String, id: Identifier) extends Event[Identifier]
 
-    final case class SuiteFinished[Identifier](name: String, id: Identifier, succeeded: Boolean)
-      extends Event[Identifier]
+    final case class SuiteFinished[Identifier](name: String, id: Identifier, succeeded: Boolean) extends Event[Identifier]
 
     implicit def eq[Identifier]: Eq[Event[Identifier]] = Eq.fromUniversalEquals
   }
@@ -141,12 +141,13 @@ object Reporter {
       }
 
       fs2.Stream.emit(Console.RESET) ++
-        cells.foldMap(fs2.Stream.emit(_)).groupAdjacentBy(_.status).map(_.map(_.size)).map {
-          case (status, cellCount) => status.color ++ status.stringify.combineN(cellCount)
+        cells.foldMap(fs2.Stream.emit(_)).groupAdjacentBy(_.status).map(_.map(_.size)).map { case (status, cellCount) =>
+          status.color ++ status.stringify.combineN(cellCount)
         } ++
         fs2.Stream.emits(failedSuiteCountOption.toList) ++
         fs2.Stream.emit(Console.RESET)
     }.compile.string
+
   }
 
   object SuiteHistory {
@@ -167,6 +168,7 @@ object Reporter {
         case Succeeded => Console.GREEN
         case Failed    => Console.RED
       }
+
     }
 
     object Status {
@@ -180,7 +182,7 @@ object Reporter {
 
     def initial(rootId: Unique): SuiteHistory = SuiteHistory(Chain.one(Cell(rootId, Status.Pending)))
 
-    type MState[F[_]] = MonadState[F, SuiteHistory]
+    type MState[F[_]] = Stateful[F, SuiteHistory]
     def MState[F[_]](implicit F: MState[F]): MState[F] = F
 
     def replace[F[_]: MState](toRemove: Unique, cells: NonEmptyList[Cell]): F[Unit] =
@@ -188,8 +190,8 @@ object Reporter {
         SuiteHistory
           .cells
           .modify(
-            flatReplaceFirst {
-              case Cell(`toRemove`, Status.Pending) => Chain.fromSeq(cells.toList)
+            flatReplaceFirst { case Cell(`toRemove`, Status.Pending) =>
+              Chain.fromSeq(cells.toList)
             }
           )
       )
@@ -218,6 +220,7 @@ object Reporter {
         ConsoleOut[F].putStrLn(clear ++ result.stringify)
       }
     }
+
   }
 
   def consoleInstance[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = Ref[F].of(0).map { identifiers =>
@@ -242,22 +245,21 @@ object Reporter {
       private val putTest = putStrWithDepth(1)
 
       def publish(event: Event[Identifier]): F[Unit] = event match {
-        case Event.TestStarted(name)      => putTest(show"Starting test: $name")
-        case Event.TestFinished(name)     => putTest(show"Finished test: $name")
-        case Event.SuiteStarted(name, id) => putSuite(show"Starting suite: $name with id $id")
+        case Event.TestStarted(name)             => putTest(show"Starting test: $name")
+        case Event.TestFinished(name)            => putTest(show"Finished test: $name")
+        case Event.SuiteStarted(name, id)        => putSuite(show"Starting suite: $name with id $id")
         case Event.SuiteFinished(name, id, succ) =>
           putSuite(show"Finished suite: $name with id $id. Succeeded? $succ")
       }
     }
   }
 
-  import com.olegpy.meow.effects._
-
   def visual[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = {
     val newId = Sync[F].delay(new Unique)
 
     newId.flatMap { rootIdent =>
-      Ref[F].of(SuiteHistory.initial(rootIdent)).map(_.stateInstance).map { implicit S =>
+      Ref[F].of(SuiteHistory.initial(rootIdent)).map { ref =>
+        implicit val S = monadStateRef[F, SuiteHistory](ref)
         new Reporter[F] {
           type Identifier = Unique
           val root: Unique = rootIdent
@@ -283,10 +285,21 @@ object Reporter {
     }
   }
 
+  private def monadStateRef[F[_]: Monad, S](ref: Ref[F, S]): Stateful[F, S] = new Stateful[F, S] {
+    val monad: Monad[F] = Monad[F]
+
+    def get: F[S] = ref.get
+
+    def set(s: S): F[Unit] = ref.set(s)
+
+    override def modify(f: S => S): F[Unit] = ref.update(f)
+  }
+
   def noop[F[_]: Applicative]: Reporter[F] = new Reporter[F] {
     type Identifier = Unit
     val root: Identifier = ()
     def splitParent(parent: Identifier, count: Int): F[NonEmptyList[Identifier]] = ().pure[NonEmptyList].pure[F]
     def publish(event: Event[Identifier]): F[Unit] = Applicative[F].unit
   }
+
 }

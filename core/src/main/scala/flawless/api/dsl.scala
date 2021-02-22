@@ -10,7 +10,6 @@ import cats.Show
 import cats.Eval
 import flawless.PredicateT
 import cats.kernel.Eq
-import cats.mtl.instances.all._
 import flawless.Predicate
 import cats.Functor
 import flawless.{Suite => _, _}
@@ -25,8 +24,7 @@ trait AllDsl {
   def test[F[_]](name: String)(assertions: F[Assertion]): NonEmptyList[Test[F]] =
     NonEmptyList.one(Test(name, TestRun.Eval(assertions)))
 
-  /**
-    * Provides access to assertions in a monadic fashion.
+  /** Provides access to assertions in a monadic fashion.
     * If no assertions are added, the test completes with a single failed assertion (making it impossible to have a green test without assertions).
     */
   def testMonadic[F[_]: Sync](name: String)(assertions: Assert[F] => F[Unit]): NonEmptyList[Test[F]] =
