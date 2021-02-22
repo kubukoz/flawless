@@ -29,4 +29,5 @@ object FlawlessTests extends IOApp with TestApp {
         MonadicTestSuite[IO]
       )
     }
+
 }

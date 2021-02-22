@@ -12,4 +12,5 @@ object SimplePureTest extends SuiteClass[Nothing] {
       ensureEqual(2 + 2, 3) |+| ensureEqual(2, 3)
     }
   }
+
 }

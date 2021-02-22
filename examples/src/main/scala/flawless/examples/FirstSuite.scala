@@ -23,4 +23,5 @@ object FirstSuite extends SuiteClass[Nothing] {
         }
       )
   }
+
 }

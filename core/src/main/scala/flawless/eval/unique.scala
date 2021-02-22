@@ -16,4 +16,5 @@ object unique {
     implicit val show: Show[Unique] = Show.fromToString
     implicit val eq: Eq[Unique] = Eq.fromUniversalEquals
   }
+
 }

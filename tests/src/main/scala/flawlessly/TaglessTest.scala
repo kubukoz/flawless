@@ -25,6 +25,7 @@ object MyAlg {
       val reset: F[Unit] = ref.set(0)
     }
   }
+
 }
 
 object TaglessTest {
@@ -47,6 +48,7 @@ object TaglessTest {
       }
     )
   }
+
 }
 
 object TaglessTestLocalResource {
@@ -56,4 +58,5 @@ object TaglessTestLocalResource {
       TaglessTest[F].renameEach(_ => "tagless with local instance".pure[F])
     }
   }
+
 }

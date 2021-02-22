@@ -27,4 +27,5 @@ object IOSuite extends SuiteClass[IO] {
       )
     )
   }
+
 }

@@ -13,8 +13,7 @@ trait TestApp { self: IOApp =>
     Interpreter.defaultInterpreter[F]
 }
 
-/**
-  * Optional trait for you to extend, so that all suites are accessible with the same interface.
+/** Optional trait for you to extend, so that all suites are accessible with the same interface.
   */
 trait SuiteClass[+F[_]] {
   def runSuite: Suite[F]

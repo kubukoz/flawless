@@ -20,4 +20,5 @@ object PredicateT {
     def liftM[G[_]](implicit G: Functor[G], isId: F[Assertion] <:< Assertion): PredicateT[G, G[A]] =
       PredicateT(_.map((predicate.apply _).andThen(isId)))
   }
+
 }

@@ -22,9 +22,11 @@ trait AllPredicates {
     actual =>
       Diff[T].apply(actual, expected) match {
         case diff if diff.isIdentical => Assertion.successful
-        case diff =>
+        case diff                     =>
           Assertion
-            .failed(show"$actual (actual) was not equal to $expected (expected). Diff: ${Console.RESET}$diff") //this reset is a hacky hack, but works!
+            .failed(
+              show"$actual (actual) was not equal to $expected (expected). Diff: ${Console.RESET}$diff"
+            ) //this reset is a hacky hack, but works!
       }
   }
 
@@ -42,6 +44,7 @@ trait AllPredicates {
     case true  => Assertion.successful
     case false => Assertion.failed(ifFalse)
   }
+
 }
 
 final class SelectPartiallyApplied[A] private[api] (private val dummy: Boolean) extends AnyVal {

@@ -7,6 +7,7 @@ import flawless.data.Suite
 import cats.implicits._
 
 object ExpensiveSuite extends SuiteClass[Nothing] {
+
   private def fib(n: Long): Long = {
     def go(a: Long, b: Long, n: Long): Long =
       if (n > 0)
@@ -28,8 +29,8 @@ object ExpensiveSuite extends SuiteClass[Nothing] {
             5L -> 5L,
             6L -> 8L
           )
-          .reduceMap {
-            case (x, y) => ensureEqual(fib(x), y)
+          .reduceMap { case (x, y) =>
+            ensureEqual(fib(x), y)
           }
       },
       lazyTest("fib(Int.MaxValue)") {
@@ -37,4 +38,5 @@ object ExpensiveSuite extends SuiteClass[Nothing] {
       }
     )
   }
+
 }

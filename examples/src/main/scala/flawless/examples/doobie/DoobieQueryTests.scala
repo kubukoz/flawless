@@ -16,4 +16,5 @@ final class DoobieQueryTests[F[_]: Bracket[*[_], Throwable]](xa: Transactor[F]) 
       sql"select 1".query[Int].to[List].map(ensureEqual(_, List(1))).transact(xa)
     }
   }
+
 }

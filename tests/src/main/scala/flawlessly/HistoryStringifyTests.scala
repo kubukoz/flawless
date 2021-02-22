@@ -22,8 +22,8 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
     SuiteHistory(
       Chain
         .fromSeq(statuses.map(_(Status)))
-        .flatMap {
-          case (n, status) => Chain.fromSeq(List.fill(n)(status))
+        .flatMap { case (n, status) =>
+          Chain.fromSeq(List.fill(n)(status))
         }
         .map(Cell(u, _))
     )
@@ -82,4 +82,5 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
       }
     )
   }
+
 }

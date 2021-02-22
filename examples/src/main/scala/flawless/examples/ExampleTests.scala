@@ -27,16 +27,16 @@ object ExampleTests extends IOApp with TestApp {
 
   val dbTests: Suite[IO] = {
     val xa = for {
-      connectEc <- ExecutionContexts.fixedThreadPool[IO](10)
-      blocker   <- Blocker[IO]
+      connectEc  <- ExecutionContexts.fixedThreadPool[IO](10)
+      blocker    <- Blocker[IO]
       transactor <- HikariTransactor.newHikariTransactor[IO](
-                     "org.postgresql.Driver",
-                     "jdbc:postgresql://localhost:5432/postgres",
-                     "postgres",
-                     "postgres",
-                     connectEc,
-                     blocker
-                   )
+                      "org.postgresql.Driver",
+                      "jdbc:postgresql://localhost:5432/postgres",
+                      "postgres",
+                      "postgres",
+                      connectEc,
+                      blocker
+                    )
     } yield transactor
 
     Suite
@@ -58,4 +58,5 @@ object ExampleTests extends IOApp with TestApp {
         dbTests
       )
     )
+
 }
