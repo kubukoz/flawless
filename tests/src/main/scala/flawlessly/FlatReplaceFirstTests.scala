@@ -31,7 +31,7 @@ object FlatReplaceFirstTests extends SuiteClass[NoEffect] {
           challenge(NonEmptyChain(3), Chain(10, 20))
       },
       pureTest("if the function matches one of the unique elements, others are left unchanged") {
-        ensureEqualEq(flatReplaceFirst[Int] { case 1   => Chain(10, 20) }(Chain(1, 2, 3)), Chain(10, 20, 2, 3)) |+|
+        ensureEqualEq(flatReplaceFirst[Int] { case 1 => Chain(10, 20) }(Chain(1, 2, 3)), Chain(10, 20, 2, 3)) |+|
           ensureEqualEq(flatReplaceFirst[Int] { case 2 => Chain(10, 20) }(Chain(1, 2, 3)), Chain(1, 10, 20, 3)) |+|
           ensureEqualEq(flatReplaceFirst[Int] { case 3 => Chain(10, 20) }(Chain(1, 2, 3)), Chain(1, 2, 10, 20))
       },
@@ -40,4 +40,5 @@ object FlatReplaceFirstTests extends SuiteClass[NoEffect] {
       }
     )
   }
+
 }

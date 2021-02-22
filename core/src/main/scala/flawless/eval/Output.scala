@@ -15,6 +15,7 @@ object Output {
     implicit val show: Show[Suite] = s => show"Suite(name = ${s.name}, tests = ${s.tests})"
     implicit val eq: Eq[Suite] = Eq.by(unapply(_).get)
   }
+
   final case class Test(name: String, problems: EitherNel[String, Unit])
 
   object Test {

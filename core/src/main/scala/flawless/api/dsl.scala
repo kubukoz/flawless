@@ -2,18 +2,17 @@ package flawless.api
 
 import flawless.data._
 import cats.data._
-import cats.effect.Sync
-import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.softwaremill.diffx.Diff
 import cats.Show
 import cats.Eval
 import flawless.PredicateT
 import cats.kernel.Eq
-import cats.mtl.instances.all._
 import flawless.Predicate
 import cats.Functor
 import flawless.{Suite => _, _}
+import cats.effect.kernel.Ref
+import cats.FlatMap
 
 trait AllDsl {
 
@@ -25,11 +24,10 @@ trait AllDsl {
   def test[F[_]](name: String)(assertions: F[Assertion]): NonEmptyList[Test[F]] =
     NonEmptyList.one(Test(name, TestRun.Eval(assertions)))
 
-  /**
-    * Provides access to assertions in a monadic fashion.
+  /** Provides access to assertions in a monadic fashion.
     * If no assertions are added, the test completes with a single failed assertion (making it impossible to have a green test without assertions).
     */
-  def testMonadic[F[_]: Sync](name: String)(assertions: Assert[F] => F[Unit]): NonEmptyList[Test[F]] =
+  def testMonadic[F[_]: Ref.Make: FlatMap](name: String)(assertions: Assert[F] => F[Unit]): NonEmptyList[Test[F]] =
     test[F](name) {
       Ref[F]
         .of(none[Assertion])

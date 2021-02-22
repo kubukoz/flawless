@@ -10,7 +10,7 @@ object ChainUtils {
 
     @tailrec
     def go(list: Chain[A], memory: Chain[A]): Chain[A] = list match {
-      case Chain.nil => memory
+      case Chain.nil     => memory
       case head ==: tail =>
         f.lift(head) match {
           case Some(elems) => memory ++ elems ++ tail
@@ -20,4 +20,5 @@ object ChainUtils {
 
     go(_, Chain.nil)
   }
+
 }

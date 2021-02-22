@@ -56,8 +56,7 @@ object RunStats {
       optics.suiteToTests composeFold optics.testToAssertionResults
   }
 
-  /**
-    * For each element `a` in `fa`, partition all the selected elements found in `a` by the given predicate.
+  /** For each element `a` in `fa`, partition all the selected elements found in `a` by the given predicate.
     *
     * @param fa the root container (always the same on the same tree)
     * @param select the way to select all the elements you want to end up in the list
@@ -75,10 +74,9 @@ object RunStats {
 
   final class GetStatsPartiallyApplied[F[_]: Foldable] private[RunStats] (suites: F[Suite[Id]]) {
 
-    /**
-      * Get the stats for the selected metric (as defined by the `select` traversal) of all the suites in `fa`.
+    /** Get the stats for the selected metric (as defined by the `select` traversal) of all the suites in `fa`.
       * `traversal` defines how to go from the selected metric to the assertions.
-      * */
+      */
     def of[Selected](select: Fold[Suite[Id], Selected], traversal: Fold[Selected, Assertion.Result]): RunStats.Stat = {
       val (succeeded, failed) =
         partitionAll(suites, select, traversal.all(_.isSuccessful))
@@ -88,6 +86,7 @@ object RunStats {
 
       RunStats.Stat(failureCount + successCount, successCount, failureCount)
     }
+
   }
 
   final case class Stat(total: Int, successful: Int, failed: Int)

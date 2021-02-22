@@ -2,16 +2,17 @@ package flawlessly
 
 import flawless._
 import flawless.syntax._
-import cats.effect.Sync
 import cats.Applicative
 import flawless.data.Assertion
 import cats.data.NonEmptyList
 import flawless.data.Test
 import cats.data.Writer
+import cats.effect.kernel.Ref
+import cats.Monad
 
 object MonadicTestSuite {
 
-  def apply[F[_]: Sync]: Suite[F] = suite("MonadicTestSuite") {
+  def apply[F[_]: Ref.Make: Monad]: Suite[F] = suite("MonadicTestSuite") {
 
     val failedDueToAssertions: PredicateT[F, Test[F]] =
       select[Test[F]](_.result.assertions[F])(
@@ -32,4 +33,5 @@ object MonadicTestSuite {
       }
     )
   }
+
 }

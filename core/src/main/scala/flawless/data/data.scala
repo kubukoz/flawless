@@ -8,9 +8,7 @@ import cats.NonEmptyParallel
 import cats.Apply
 import cats.Parallel
 import cats.NonEmptyTraverse
-import cats.effect.concurrent.Ref
 import cats.effect.Resource
-import cats.effect.Bracket
 import cats.Functor
 import cats.FlatMap
 
@@ -24,7 +22,9 @@ import cats.data.Chain
 import cats.data.NonEmptyList
 import cats.kernel.Eq
 import cats.Show
-import cats.mtl.FunctorTell
+import cats.mtl.Tell
+import cats.effect.kernel.Ref
+import cats.effect.kernel.MonadCancel
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -47,6 +47,7 @@ sealed trait Assertion extends Product with Serializable {
     case another: Assertion => this === another
     case _                  => false
   }
+
 }
 
 object Assertion {
@@ -78,6 +79,7 @@ object Assertion {
       case Result.Failed(_)  => false
       case Result.Successful => true
     }
+
   }
 
   object Result {
@@ -93,6 +95,7 @@ object Assertion {
       case Successful      => "Successful"
       case Failed(message) => show"Failed($message)"
     }
+
   }
 
   final case class One(result: Result) extends Assertion
@@ -109,10 +112,10 @@ object Assertion {
     case One(result)     => show"Assertion.One(${result})"
     case All(assertions) => show"Assertion.All(${assertions})"
   }
+
 }
 
-/**
-  * An abstraction on methods of combining two effects - parallel or sequential
+/** An abstraction on methods of combining two effects - parallel or sequential
   */
 sealed trait Traversal[F[_]] extends Product with Serializable {
 
@@ -151,36 +154,30 @@ object Traversal {
   def parallel[F[_]: NonEmptyParallel]: Traversal[F] = Parallel(NonEmptyParallel[F])
 }
 
-/**
-  * A value of this type is a non-empty sequence of test suites. Each suite must have a name.
+/** A value of this type is a non-empty sequence of test suites. Each suite must have a name.
   * Suites can be composed to run sequentially or in parallel to each other. Effects and resources can also be lifted to a Suite.
   */
 sealed trait Suite[+F[_]] extends Product with Serializable {
 
-  /**
-    * Rename each suite in this value using the given function.
+  /** Rename each suite in this value using the given function.
     * todo: this should be an aspect
-    *  */
+    */
   def renameEach[F2[a] >: F[a]: FlatMap](modName: String => F2[String]): Suite[F2] =
     Suite.renameEach(modName).apply(this)
 
-  /**
-    * Combine the two sets of suites sequentially.
+  /** Combine the two sets of suites sequentially.
     */
   def zip[F2[a] >: F[a]: Apply](another: Suite[F2]): Suite[F2] = Suite.sequential(this, another)
 
-  /**
-    * Combine the two sets of suites in parallel.
-    * */
+  /** Combine the two sets of suites in parallel.
+    */
   def parZip[F2[a] >: F[a]: NonEmptyParallel](another: Suite[F2]): Suite[F2] = Suite.parallel(this, another)
 
-  /**
-    * Alias for [[zip]].
+  /** Alias for [[zip]].
     */
   def |+|[F2[a] >: F[a]: Apply](another: Suite[F2]): Suite[F2] = this zip another
 
-  /**
-    * Alias for [[parZip]].
+  /** Alias for [[parZip]].
     */
   def |&|[F2[a] >: F[a]: NonEmptyParallel](another: Suite[F2]): Suite[F2] = this parZip another
 
@@ -188,8 +185,7 @@ sealed trait Suite[+F[_]] extends Product with Serializable {
   def parCombineN[F2[a] >: F[a]: NonEmptyParallel](n: Int): Suite[F2] =
     Suite.parSequence[F2](NonEmptyList.one(this).combineN(n))
 
-  /**
-    * Widen the effect type of this suite.
+  /** Widen the effect type of this suite.
     */
   def widenF[F2[a] >: F[a]]: Suite[F2] = this
 }
@@ -218,16 +214,15 @@ object Suite {
     algebra.Sequence(flattenedSameTraversal, traversal)
   }
 
-  def resource[F[_]: Bracket[*[_], Throwable]](suitesInResource: Resource[F, Suite[F]]): Suite[F] =
-    algebra.RResource(suitesInResource, Bracket[F, Throwable])
+  def resource[F[_]](suitesInResource: Resource[F, Suite[F]])(implicit F: MonadCancel[F, Throwable]): Suite[F] =
+    algebra.RResource(suitesInResource, F)
 
   def suspend[F[_]](suites: F[Suite[F]]): Suite[F] = algebra.Suspend(suites)
 
   def thrown(e: Throwable): Suite.algebra.One[flawless.NoEffect] =
     algebra.One("failed", NonEmptyList.one(Test.thrown(e)))
 
-  /**
-    * Semigroup instance that combines suites sequentially.
+  /** Semigroup instance that combines suites sequentially.
     */
   implicit def suiteSemigroup[F[_]: Apply]: Semigroup[Suite[F]] = _ zip _
 
@@ -239,7 +234,7 @@ object Suite {
         Functor[f].map(modName(o.name))(algebra.One[f](_: String, o.tests))
 
       case s: algebra.Sequence[f]  => s.traversal.traverse(s.suites)(go)
-      case r: algebra.RResource[f] => r.resuite.evalMap(go)(r.bracket)
+      case r: algebra.RResource[f] => r.resuite.evalMap(go)
       case s: algebra.Suspend[f]   => s.suite.flatMap(go)
     }
 
@@ -250,7 +245,7 @@ object Suite {
     final case class One[F[_]](name: String, tests: NonEmptyList[Test[F]]) extends Suite[F]
     final case class Sequence[F[_]](suites: NonEmptyList[Suite[F]], traversal: Traversal[F]) extends Suite[F]
     final case class Suspend[F[_]](suite: F[Suite[F]]) extends Suite[F]
-    final case class RResource[F[_]](resuite: Resource[F, Suite[F]], bracket: Bracket[F, Throwable]) extends Suite[F]
+    final case class RResource[F[_]](resuite: Resource[F, Suite[F]], monadCancel: MonadCancel[F, Throwable]) extends Suite[F]
   }
 
   private[flawless] val flatten: Suite[Id] => NonEmptyList[algebra.One[Id]] = {
@@ -259,6 +254,7 @@ object Suite {
     case algebra.Suspend(suites)     => flatten(suites)
     case algebra.RResource(_, _)     => throw new AssertionError("Impossible! Id doesn't form resources.")
   }
+
 }
 
 //todo rename result to run
@@ -275,6 +271,7 @@ sealed trait TestRun[+F[_]] extends Product with Serializable {
     case TestRun.Pure(result) => result.pure[F2]
     case TestRun.Lazy(result) => result.value.pure[F2]
   }
+
 }
 
 object TestRun {
@@ -290,13 +287,16 @@ trait Assert[F[_]] {
 object Assert {
 
   def refInstance[F[_]: Functor](ref: Ref[F, Option[Assertion]]): Assert[F] = {
-    import com.olegpy.meow.effects._
-
-    ref.runTell { implicit S =>
-      functorTellInstance[F]
-    }
+    implicit val ft: Tell[F, Option[Assertion]] = functorTellRef(ref)
+    functorTellInstance[F]
   }
 
-  def functorTellInstance[F[_]: FunctorTell[*[_], Option[Assertion]]]: Assert[F] =
-    assertion => FunctorTell[F, Option[Assertion]].tell(assertion.some)
+  private def functorTellRef[F[_]: Functor, A: Semigroup](ref: Ref[F, A]): Tell[F, A] = new Tell[F, A] {
+    val functor: Functor[F] = Functor[F]
+
+    def tell(l: A): F[Unit] = ref.update(_ |+| l)
+  }
+
+  def functorTellInstance[F[_]: Tell[*[_], Option[Assertion]]]: Assert[F] =
+    assertion => Tell[F, Option[Assertion]].tell(assertion.some)
 }

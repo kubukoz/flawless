@@ -83,8 +83,8 @@ package object eval {
         .result
         .assertions
         .results
-        .collect {
-          case Failed(message) => message
+        .collect { case Failed(message) =>
+          message
         }
         .toList
 
@@ -101,4 +101,5 @@ package object eval {
     // Settings(visual = false).pure[F]
     // Settings(visual = args.contains("visual")).pure[F]
   }
+
 }

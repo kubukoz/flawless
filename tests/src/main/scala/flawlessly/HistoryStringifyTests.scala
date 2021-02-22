@@ -4,14 +4,14 @@ import flawless.data.Suite
 import flawless._
 import flawless.syntax._
 import cats.implicits._
-import flawless.eval.unique.Unique
 import cats.data.Chain
+import cats.effect.kernel.Unique
 
 object HistoryStringifyTests extends SuiteClass[NoEffect] {
   import flawless.eval.Reporter.SuiteHistory
   import SuiteHistory._
 
-  val u = new Unique
+  val u = new Unique.Token
 
   def green(s: String) = Console.GREEN ++ s
   def red(s: String) = Console.RED ++ s
@@ -22,8 +22,8 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
     SuiteHistory(
       Chain
         .fromSeq(statuses.map(_(Status)))
-        .flatMap {
-          case (n, status) => Chain.fromSeq(List.fill(n)(status))
+        .flatMap { case (n, status) =>
+          Chain.fromSeq(List.fill(n)(status))
         }
         .map(Cell(u, _))
     )
@@ -82,4 +82,5 @@ object HistoryStringifyTests extends SuiteClass[NoEffect] {
       }
     )
   }
+
 }

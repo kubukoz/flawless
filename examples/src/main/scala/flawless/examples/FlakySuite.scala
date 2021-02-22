@@ -16,4 +16,5 @@ object FlakySuite extends SuiteClass[IO] {
       flaky.map(ensureEqual(_, false))
     }.combineN(2)
   }
+
 }
