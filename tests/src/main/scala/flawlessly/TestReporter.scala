@@ -8,7 +8,6 @@ import cats.data.Chain
 import flawless.eval.Reporter
 import flawless.eval.Interpreter
 import cats.Show
-import cats.effect.Sync
 import cats.Foldable
 import cats.data.NonEmptyList
 import cats.Parallel
@@ -17,13 +16,14 @@ import cats.mtl.Tell
 import cats.Alternative
 import cats.Monad
 import cats.data.ReaderWriterStateT
-import cats.effect.Bracket
+import cats.effect.kernel.MonadCancel
+import cats.effect.MonadCancelThrow
 
 object TestReporter {
-  implicit def instance[F[_]: Sync]: TestReporter[F] = new TestReporter[F]
+  implicit def instance[F[_]: MonadCancelThrow]: TestReporter[F] = new TestReporter[F]
 }
 
-final class TestReporter[F[_]: Sync] {
+final class TestReporter[F[_]: MonadCancelThrow] {
   sealed trait LogEvent extends Product with Serializable
 
   object LogEvent {
@@ -34,7 +34,7 @@ final class TestReporter[F[_]: Sync] {
 
   type WC[A] = ReaderWriterStateT[F, Unit, Chain[LogEvent], Int, A]
 
-  implicit val wcBracket: Bracket[WC, Throwable] = Sync.catsReaderWriteStateTSync
+  implicit val wcMonadCancel: MonadCancel[WC, Throwable] = MonadCancel.monadCancelForReaderWriterStateT
   //The instance shall not be used for parallelism! It's pretty much just a marker
   implicit val wcParallel: Parallel[WC] = Parallel.identity
 

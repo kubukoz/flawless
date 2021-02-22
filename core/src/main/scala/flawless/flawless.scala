@@ -1,15 +1,16 @@
 import cats.effect.ExitCode
 import cats.implicits._
-import cats.effect.ConsoleOut
+import cats.effect.std.Console
 import flawless.data.Assertion
 import flawless.eval.Interpreter
 import flawless.eval.summarize
 import flawless.eval.toTerminalOutput
 import flawless.eval.loadArgs
+import cats.Monad
+import cats.effect.kernel.Unique
+import cats.effect.kernel.Ref
 
 package object flawless {
-
-  import cats.effect.Sync
 
   import flawless.eval.Reporter
 
@@ -29,7 +30,7 @@ package object flawless {
   object dsl extends api.AllDsl
   object predicates extends api.AllPredicates
 
-  def runTests[F[_]: Interpreter: ConsoleOut: Sync](args: List[String])(suites: Suite[F]): F[ExitCode] =
+  def runTests[F[_]: Interpreter: Console: Unique: Ref.Make: Monad](args: List[String])(suites: Suite[F]): F[ExitCode] =
     loadArgs[F](args)
       .flatMap {
         case args if args.visual => Reporter.visual[F]
@@ -38,7 +39,7 @@ package object flawless {
       .flatMap(Interpreter[F].interpret(_)(suites))
       .map(summarize)
       .map(toTerminalOutput)
-      .flatMap(_.leftTraverse(ConsoleOut[F].putStrLn))
+      .flatMap(_.leftTraverse(Console[F].println(_)))
       .map(_._2)
 
 }

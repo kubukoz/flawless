@@ -5,24 +5,23 @@ import flawless.data.Test
 import flawless.data.Assertion
 import flawless.data.TestRun
 import cats.tagless.finalAlg
-import cats.effect.ConsoleOut
+import cats.effect.std.Console
 import Interpreter.InterpretOne
 import flawless.data.Suite
 import flawless.NoEffect
 import cats.data.NonEmptyList
 import cats.mtl.Stateful
-import flawless.eval.unique.Unique
 import cats.kernel.Eq
-import cats.effect.Sync
 import cats.Applicative
-import cats.effect.concurrent.Ref
-import cats.MonadError
+import cats.effect.Ref
 import scala.util.control.NonFatal
 import monocle.macros.Lenses
 import cats.data.Chain
 import flawless.util.ChainUtils._
 import cats.FlatMap
 import cats.Monad
+import cats.effect.kernel.Unique
+import cats.effect.MonadThrow
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -36,7 +35,7 @@ object Interpreter {
   //A type alias for an action that interprets a single instance of Algebra (e.g. suite or test)
   type InterpretOne[Algebra[_[_]], F[_]] = Algebra[F] => F[Algebra[NoEffect]]
 
-  def defaultInterpreter[F[_]: MonadError[*[_], Throwable]]: Interpreter[F] =
+  def defaultInterpreter[F[_]: MonadThrow]: Interpreter[F] =
     new Interpreter[F] {
 
       private def interpretTest(implicit reporter: Reporter[F]): InterpretOne[Test, F] = { test =>
@@ -94,7 +93,7 @@ object Interpreter {
               .map(Suite.sequence[f](_))
           case o: One[f]       => interpretSuite(reporter)(parentId)(o)
           case s: Suspend[f]   => s.suite.flatMap(interpretOne(parentId))
-          case r: RResource[f] => r.resuite.use(interpretOne(parentId))(r.bracket)
+          case r: RResource[f] => r.resuite.use(interpretOne(parentId))(r.monadCancel)
         }
 
         interpretOne(reporter.root)
@@ -137,22 +136,22 @@ object Reporter {
       val failedSuites = cells.count(_.status === SuiteHistory.Status.Failed)
 
       val failedSuiteCountOption = failedSuites.some.filter(_ > 0).map { failures =>
-        show"\n${Console.RED}[$failures failed]"
+        show"\n${scala.Console.RED}[$failures failed]"
       }
 
-      fs2.Stream.emit(Console.RESET) ++
+      fs2.Stream.emit(scala.Console.RESET) ++
         cells.foldMap(fs2.Stream.emit(_)).groupAdjacentBy(_.status).map(_.map(_.size)).map { case (status, cellCount) =>
           status.color ++ status.stringify.combineN(cellCount)
         } ++
         fs2.Stream.emits(failedSuiteCountOption.toList) ++
-        fs2.Stream.emit(Console.RESET)
+        fs2.Stream.emit(scala.Console.RESET)
     }.compile.string
 
   }
 
   object SuiteHistory {
 
-    final case class Cell(id: Unique, status: Status)
+    final case class Cell(id: Unique.Token, status: Status)
 
     sealed trait Status extends Product with Serializable {
       import Status._
@@ -163,10 +162,10 @@ object Reporter {
       }
 
       def color: String = this match {
-        case Pending   => Console.RESET
-        case Running   => Console.YELLOW
-        case Succeeded => Console.GREEN
-        case Failed    => Console.RED
+        case Pending   => scala.Console.RESET
+        case Running   => scala.Console.YELLOW
+        case Succeeded => scala.Console.GREEN
+        case Failed    => scala.Console.RED
       }
 
     }
@@ -180,12 +179,12 @@ object Reporter {
       implicit val eq: Eq[Status] = Eq.fromUniversalEquals
     }
 
-    def initial(rootId: Unique): SuiteHistory = SuiteHistory(Chain.one(Cell(rootId, Status.Pending)))
+    def initial(rootId: Unique.Token): SuiteHistory = SuiteHistory(Chain.one(Cell(rootId, Status.Pending)))
 
     type MState[F[_]] = Stateful[F, SuiteHistory]
     def MState[F[_]](implicit F: MState[F]): MState[F] = F
 
-    def replace[F[_]: MState](toRemove: Unique, cells: NonEmptyList[Cell]): F[Unit] =
+    def replace[F[_]: MState](toRemove: Unique.Token, cells: NonEmptyList[Cell]): F[Unit] =
       MState[F].modify(
         SuiteHistory
           .cells
@@ -196,16 +195,16 @@ object Reporter {
           )
       )
 
-    def markRunning[F[_]: MState](id: Unique): F[Unit] =
+    def markRunning[F[_]: MState](id: Unique.Token): F[Unit] =
       setStatus(id, Status.Running)
 
-    def markFinished[F[_]: MState](id: Unique, succeeded: Boolean): F[Unit] = {
+    def markFinished[F[_]: MState](id: Unique.Token, succeeded: Boolean): F[Unit] = {
       val newStatus = if (succeeded) SuiteHistory.Status.Succeeded else SuiteHistory.Status.Failed
 
       setStatus(id, newStatus)
     }
 
-    def setStatus[F[_]: MState](id: Unique, newStatus: Status): F[Unit] = MState[F].modify {
+    def setStatus[F[_]: MState](id: Unique.Token, newStatus: Status): F[Unit] = MState[F].modify {
       SuiteHistory.cells.modify {
         flatReplaceFirst {
           case cell if cell.id === id => Chain.one(cell.copy(status = newStatus))
@@ -213,17 +212,17 @@ object Reporter {
       }
     }
 
-    def show[F[_]: MState: FlatMap: ConsoleOut]: F[Unit] = {
+    def show[F[_]: MState: FlatMap: Console]: F[Unit] = {
       val clear = "\u001b[2J\u001b[H"
 
       MState[F].get.flatMap { result =>
-        ConsoleOut[F].putStrLn(clear ++ result.stringify)
+        Console[F].println(clear ++ result.stringify)
       }
     }
 
   }
 
-  def consoleInstance[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = Ref[F].of(0).map { identifiers =>
+  def consoleInstance[F[_]: Ref.Make: Monad: Console]: F[Reporter[F]] = Ref[F].of(0).map { identifiers =>
     new Reporter[F] {
       type Identifier = Int
 
@@ -239,7 +238,7 @@ object Reporter {
         }
       }
 
-      private def putStrWithDepth(depth: Int): String => F[Unit] = s => ConsoleOut[F].putStrLn(" " * depth * 2 + s)
+      private def putStrWithDepth(depth: Int): String => F[Unit] = s => Console[F].println(" " * depth * 2 + s)
 
       private val putSuite = putStrWithDepth(0)
       private val putTest = putStrWithDepth(1)
@@ -254,17 +253,18 @@ object Reporter {
     }
   }
 
-  def visual[F[_]: Sync: ConsoleOut]: F[Reporter[F]] = {
-    val newId = Sync[F].delay(new Unique)
+  def visual[F[_]: Unique: Console: Ref.Make: Monad]: F[Reporter[F]] = {
+    val newId = Unique[F].unique
 
     newId.flatMap { rootIdent =>
       Ref[F].of(SuiteHistory.initial(rootIdent)).map { ref =>
         implicit val S = monadStateRef[F, SuiteHistory](ref)
-        new Reporter[F] {
-          type Identifier = Unique
-          val root: Unique = rootIdent
 
-          def splitParent(parent: Unique, count: Int): F[NonEmptyList[Unique]] = {
+        new Reporter[F] {
+          type Identifier = Unique.Token
+          val root: Unique.Token = rootIdent
+
+          def splitParent(parent: Identifier, count: Int): F[NonEmptyList[Identifier]] = {
             val newIds = newId.replicateA(count).map(NonEmptyList.fromListUnsafe)
 
             newIds.flatTap { ids =>

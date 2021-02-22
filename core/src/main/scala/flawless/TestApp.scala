@@ -1,15 +1,11 @@
 package flawless
 
 import cats.effect.IOApp
-import cats.effect.Sync
-import cats.effect.Console
 import flawless.eval.Interpreter
-import cats.effect.SyncConsole
+import cats.effect.MonadThrow
 
 trait TestApp { self: IOApp =>
-  implicit def stdioConsole[F[_]: Sync]: Console[F] = SyncConsole.stdio
-
-  implicit def defaultInterpreter[F[_]: Sync]: Interpreter[F] =
+  implicit def defaultInterpreter[F[_]: MonadThrow]: Interpreter[F] =
     Interpreter.defaultInterpreter[F]
 }
 

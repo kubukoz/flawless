@@ -14,7 +14,7 @@ object FlawlessTests extends IOApp with TestApp {
   def run(args: List[String]): IO[ExitCode] =
     runTests[IO](args) {
       val tagless = Suite.suspend {
-        MyAlg.syncInstance[IO].map { implicit alg =>
+        MyAlg.refInstance[IO].map { implicit alg =>
           TaglessTest[IO]
         }
       }

@@ -26,12 +26,11 @@ val commonSettings = Seq(
   name := "flawless",
   scalacOptions -= "-Xfatal-warnings",
   libraryDependencies ++= List(
-    "co.fs2" %% "fs2-core" % "2.4.6",
+    "co.fs2" %% "fs2-core" % "3.0.0-M9",
     "org.typelevel" %% "cats-tagless-macros" % "0.12",
     "org.typelevel" %% "cats-mtl" % "1.1.2",
     "com.github.julien-truffaut" %% "monocle" % "2.0.3",
-    "org.typelevel" %% "cats-effect" % "2.3.1",
-    "dev.profunktor" %% "console4cats" % "0.8.1",
+    "org.typelevel" %% "cats-effect" % "3.0.0-RC2",
     "com.softwaremill.diffx" %% "diffx-core" % "0.3.30"
   ) ++ compilerPlugins
 )
@@ -57,6 +56,7 @@ val examples =
     .settings(
       commonSettings,
       libraryDependencies ++= List(
+        //this won't work for now
         "org.tpolecat" %% "doobie-hikari" % "0.9.4",
         "org.postgresql" % "postgresql" % "42.2.18"
       )

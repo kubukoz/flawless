@@ -3,10 +3,12 @@ package flawlessly
 import flawless._
 import flawless.dsl._
 import cats.tagless.finalAlg
-import cats.effect.Sync
-import cats.effect.concurrent.Ref
 import cats.implicits._
 import cats.data.State
+import cats.effect.kernel.Ref
+import cats.Functor
+import cats.FlatMap
+import cats.Monad
 
 @finalAlg
 trait MyAlg[F[_]] {
@@ -16,7 +18,7 @@ trait MyAlg[F[_]] {
 
 object MyAlg {
 
-  def syncInstance[F[_]: Sync]: F[MyAlg[F]] = Ref[F].of(0).map { ref =>
+  def refInstance[F[_]: Ref.Make: Functor]: F[MyAlg[F]] = Ref[F].of(0).map { ref =>
     new MyAlg[F] {
       val hello: F[Int] = ref.modifyState(
         State.modify[Int](_ + 1) *> State.get
@@ -30,7 +32,7 @@ object MyAlg {
 
 object TaglessTest {
 
-  def apply[F[_]: MyAlg: Sync]: Suite[F] = suite("tagless") {
+  def apply[F[_]: MyAlg: FlatMap: Ref.Make]: Suite[F] = suite("tagless") {
     tests(
       test("first tagless")(
         (MyAlg[F].reset *> MyAlg[F].hello, MyAlg[F].hello).mapN { (before, after) =>
@@ -53,8 +55,8 @@ object TaglessTest {
 
 object TaglessTestLocalResource {
 
-  def apply[F[_]: Sync]: Suite[F] = Suite.suspend {
-    MyAlg.syncInstance[F].map { implicit alg =>
+  def apply[F[_]: Ref.Make: Monad]: Suite[F] = Suite.suspend {
+    MyAlg.refInstance[F].map { implicit alg =>
       TaglessTest[F].renameEach(_ => "tagless with local instance".pure[F])
     }
   }

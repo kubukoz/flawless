@@ -8,9 +8,7 @@ import cats.NonEmptyParallel
 import cats.Apply
 import cats.Parallel
 import cats.NonEmptyTraverse
-import cats.effect.concurrent.Ref
 import cats.effect.Resource
-import cats.effect.Bracket
 import cats.Functor
 import cats.FlatMap
 
@@ -25,6 +23,8 @@ import cats.data.NonEmptyList
 import cats.kernel.Eq
 import cats.Show
 import cats.mtl.Tell
+import cats.effect.kernel.Ref
+import cats.effect.kernel.MonadCancel
 
 sealed trait Assertion extends Product with Serializable {
 
@@ -214,8 +214,8 @@ object Suite {
     algebra.Sequence(flattenedSameTraversal, traversal)
   }
 
-  def resource[F[_]: Bracket[*[_], Throwable]](suitesInResource: Resource[F, Suite[F]]): Suite[F] =
-    algebra.RResource(suitesInResource, Bracket[F, Throwable])
+  def resource[F[_]](suitesInResource: Resource[F, Suite[F]])(implicit F: MonadCancel[F, Throwable]): Suite[F] =
+    algebra.RResource(suitesInResource, F)
 
   def suspend[F[_]](suites: F[Suite[F]]): Suite[F] = algebra.Suspend(suites)
 
@@ -234,7 +234,7 @@ object Suite {
         Functor[f].map(modName(o.name))(algebra.One[f](_: String, o.tests))
 
       case s: algebra.Sequence[f]  => s.traversal.traverse(s.suites)(go)
-      case r: algebra.RResource[f] => r.resuite.evalMap(go)(r.bracket)
+      case r: algebra.RResource[f] => r.resuite.evalMap(go)
       case s: algebra.Suspend[f]   => s.suite.flatMap(go)
     }
 
@@ -245,7 +245,7 @@ object Suite {
     final case class One[F[_]](name: String, tests: NonEmptyList[Test[F]]) extends Suite[F]
     final case class Sequence[F[_]](suites: NonEmptyList[Suite[F]], traversal: Traversal[F]) extends Suite[F]
     final case class Suspend[F[_]](suite: F[Suite[F]]) extends Suite[F]
-    final case class RResource[F[_]](resuite: Resource[F, Suite[F]], bracket: Bracket[F, Throwable]) extends Suite[F]
+    final case class RResource[F[_]](resuite: Resource[F, Suite[F]], monadCancel: MonadCancel[F, Throwable]) extends Suite[F]
   }
 
   private[flawless] val flatten: Suite[Id] => NonEmptyList[algebra.One[Id]] = {
