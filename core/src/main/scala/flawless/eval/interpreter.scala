@@ -15,7 +15,7 @@ import cats.kernel.Eq
 import cats.Applicative
 import cats.effect.Ref
 import scala.util.control.NonFatal
-import monocle.macros.Lenses
+import monocle.macros.syntax.lens._
 import cats.data.Chain
 import flawless.util.ChainUtils._
 import cats.FlatMap
@@ -128,7 +128,6 @@ object Reporter {
     implicit def eq[Identifier]: Eq[Event[Identifier]] = Eq.fromUniversalEquals
   }
 
-  @Lenses
   final case class SuiteHistory(cells: Chain[SuiteHistory.Cell]) {
 
     //reference implementation, will be overridden for more performance (and possibly no fs2 dependency in eval)
@@ -186,8 +185,7 @@ object Reporter {
 
     def replace[F[_]: MState](toRemove: Unique.Token, cells: NonEmptyList[Cell]): F[Unit] =
       MState[F].modify(
-        SuiteHistory
-          .cells
+        _.lens(_.cells)
           .modify(
             flatReplaceFirst { case Cell(`toRemove`, Status.Pending) =>
               Chain.fromSeq(cells.toList)
@@ -205,7 +203,7 @@ object Reporter {
     }
 
     def setStatus[F[_]: MState](id: Unique.Token, newStatus: Status): F[Unit] = MState[F].modify {
-      SuiteHistory.cells.modify {
+      _.lens(_.cells).modify {
         flatReplaceFirst {
           case cell if cell.id === id => Chain.one(cell.copy(status = newStatus))
         }
