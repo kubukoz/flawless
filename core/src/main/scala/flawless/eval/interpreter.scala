@@ -55,14 +55,14 @@ object Interpreter {
       import catchers._
 
       private def interpretTest(implicit reporter: Reporter[F]): InterpretOne[Test, F] = { test =>
-        def finish(results: Assertion): Test[NoEffect] = Test(test.name, TestRun.Pure(results))
+        def finish(results: Assertion): Test[NoEffect] = Test(test.name, TestRun.algebra.Pure(results))
 
         val exec: F[Test[NoEffect]] = test.result match {
           //this is a GADT skolem - you think I'd know what that means by now...
-          case eval: TestRun.Eval[f] =>
+          case eval: TestRun.algebra.Eval[f] =>
             Defer[f].defer(eval.effect.value).handleError(catchTodo.applyOrElse(_, catchAll)).map(finish)
-          case TestRun.Pure(result)  => finish(result).pure[F]
-          case TestRun.Lazy(e)       =>
+          case TestRun.algebra.Pure(result)  => finish(result).pure[F]
+          case TestRun.algebra.Lazy(e)       =>
             finish {
               try e.value
               catch catchTodo.orElse(catchNonFatalOnly)

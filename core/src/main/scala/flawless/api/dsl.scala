@@ -24,7 +24,7 @@ trait AllDsl {
   // Effectful test.
   // Note that all side effects need to be suspended in the context of F. Relying on the laziness of the parameter is discouraged.
   def test[F[_]](name: String)(assertions: => F[Assertion]): NonEmptyList[Test[F]] =
-    NonEmptyList.one(Test(name, TestRun.Eval(Eval.later(assertions))))
+    NonEmptyList.one(Test(name, TestRun.algebra.Eval(Eval.later(assertions))))
 
   /** Provides access to assertions in a monadic fashion.
     * If no assertions are added, the test completes with a single failed assertion (making it impossible to have a green test without assertions).
@@ -58,10 +58,10 @@ trait AllDsl {
   }
 
   def pureTest(name: String)(assertions: Assertion): NonEmptyList[Test[Nothing]] =
-    NonEmptyList.one(Test(name, TestRun.Pure(assertions)))
+    NonEmptyList.one(Test(name, TestRun.algebra.Pure(assertions)))
 
   def lazyTest(name: String)(assertions: => Assertion): NonEmptyList[Test[Nothing]] =
-    NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions))))
+    NonEmptyList.one(Test(name, TestRun.algebra.Lazy(Eval.later(assertions))))
 
   object ensure {
     //todo inconsistent with ensureM.apply

@@ -269,17 +269,21 @@ final case class Test[+F[_]](name: String, result: TestRun[F])
 sealed trait TestRun[+F[_]] extends Product with Serializable {
 
   def assertions[F2[a] >: F[a]](implicit applicative: Applicative[F2]): F2[Assertion] = this match {
-    case TestRun.Eval(effect) => effect.value
-    case TestRun.Pure(result) => result.pure[F2]
-    case TestRun.Lazy(result) => result.value.pure[F2]
+    case TestRun.algebra.Eval(effect) => effect.value
+    case TestRun.algebra.Pure(result) => result.pure[F2]
+    case TestRun.algebra.Lazy(result) => result.value.pure[F2]
   }
 
 }
 
 object TestRun {
-  final case class Eval[F[_]](effect: cats.Eval[F[Assertion]]) extends TestRun[F]
-  final case class Pure(result: Assertion) extends TestRun[Nothing]
-  final case class Lazy(result: cats.Eval[Assertion]) extends TestRun[Nothing]
+
+  private[flawless] object algebra {
+    final case class Eval[F[_]](effect: cats.Eval[F[Assertion]]) extends TestRun[F]
+    final case class Pure(result: Assertion) extends TestRun[Nothing]
+    final case class Lazy(result: cats.Eval[Assertion]) extends TestRun[Nothing]
+  }
+
 }
 
 trait Assert[F[_]] {
