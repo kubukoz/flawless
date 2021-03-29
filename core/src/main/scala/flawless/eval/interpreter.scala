@@ -21,7 +21,7 @@ import flawless.util.ChainUtils._
 import cats.FlatMap
 import cats.Monad
 import cats.effect.kernel.Unique
-import cats.effect.MonadThrow
+import cats.MonadThrow
 
 @finalAlg
 trait Interpreter[F[_]] {
