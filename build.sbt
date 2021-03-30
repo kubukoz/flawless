@@ -28,7 +28,7 @@ val commonSettings = Seq(
   libraryDependencies ++= List(
     "co.fs2" %% "fs2-core" % "3.0.0-M9",
     "org.typelevel" %% "cats-tagless-macros" % "0.12",
-    "org.typelevel" %% "cats-mtl" % "1.1.2",
+    "org.typelevel" %% "cats-mtl" % "1.1.3",
     "com.github.julien-truffaut" %% "monocle" % "2.0.3",
     "org.typelevel" %% "cats-effect-std" % "3.0.0-RC2",
     "org.typelevel" %% "cats-effect-kernel" % "3.0.0-RC2",
