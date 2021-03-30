@@ -46,7 +46,7 @@ val tests =
       commonSettings,
       libraryDependencies ++= List(
         "org.typelevel" %% "cats-effect" % "3.0.0-RC2",
-        "com.softwaremill.diffx" %% "diffx-cats" % "0.3.30"
+        "com.softwaremill.diffx" %% "diffx-cats" % "0.4.2"
       )
     )
     .settings(name += "-tests")
