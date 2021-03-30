@@ -5,10 +5,13 @@ import cats.implicits._
 import flawless.data.Assertion
 
 //Predicate on a value of type A with effects in F.
-final case class PredicateT[F[_], -A](private val fun: A => F[Assertion]) extends AnyVal {
-  def apply(a: A): F[Assertion] = fun(a)
+final case class PredicateT[+F[_], -A](private val fun: A => F[Assertion]) extends AnyVal {
+  def apply(a: A): F[Assertion] = provided(a).fun(())
 
   def contramap[B](f: B => A): PredicateT[F, B] = PredicateT(fun.compose(f))
+
+  //Provide the given value to this predicate, yielding a predicate that accepts anything.
+  def provided(a: A): PredicateT[F, Any] = PredicateT(_ => fun(a))
 }
 
 object PredicateT {

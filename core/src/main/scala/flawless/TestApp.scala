@@ -3,9 +3,10 @@ package flawless
 import cats.effect.IOApp
 import flawless.eval.Interpreter
 import cats.effect.MonadThrow
+import cats.Defer
 
 trait TestApp { self: IOApp =>
-  implicit def defaultInterpreter[F[_]: MonadThrow]: Interpreter[F] =
+  implicit def defaultInterpreter[F[_]: MonadThrow: Defer]: Interpreter[F] =
     Interpreter.defaultInterpreter[F]
 }
 

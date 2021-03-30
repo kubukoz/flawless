@@ -8,16 +8,17 @@ import cats.data.NonEmptyList
 import flawless.data.Test
 import cats.data.Writer
 import cats.effect.kernel.Ref
-import cats.Monad
+import cats.effect.MonadThrow
 
 object MonadicTestSuite {
 
-  def apply[F[_]: Ref.Make: Monad]: Suite[F] = suite("MonadicTestSuite") {
+  def apply[F[_]: Ref.Make: MonadThrow]: Suite[F] = suite("MonadicTestSuite") {
+
+    def assertions(assertionPredicate: Predicate[Assertion]): PredicateT[F, Test[F]] =
+      select[Test[F]](_.result.assertions[F])(assertionPredicate.liftM[F])
 
     val failedDueToAssertions: PredicateT[F, Test[F]] =
-      select[Test[F]](_.result.assertions[F])(
-        equalTo(Assertion.failed("No assertions were made!")).liftM[F]
-      )
+      assertions(equalToEq(Assertion.failed("No assertions were made!")))
 
     tests(
       test("monadic tests fail when no assertions are given") {
