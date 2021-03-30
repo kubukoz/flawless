@@ -2,7 +2,7 @@ package flawless
 
 import cats.effect.IOApp
 import flawless.eval.Interpreter
-import cats.effect.MonadThrow
+import cats.MonadThrow
 
 trait TestApp { self: IOApp =>
   implicit def defaultInterpreter[F[_]: MonadThrow]: Interpreter[F] =

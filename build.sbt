@@ -26,13 +26,13 @@ val commonSettings = Seq(
   name := "flawless",
   scalacOptions -= "-Xfatal-warnings",
   libraryDependencies ++= List(
-    "co.fs2" %% "fs2-core" % "3.0.0-M9",
+    "co.fs2" %% "fs2-core" % "3.0.0",
     "org.typelevel" %% "cats-tagless-macros" % "0.12",
-    "org.typelevel" %% "cats-mtl" % "1.1.2",
+    "org.typelevel" %% "cats-mtl" % "1.1.3",
     "com.github.julien-truffaut" %% "monocle" % "2.0.3",
-    "org.typelevel" %% "cats-effect-std" % "3.0.0-RC2",
-    "org.typelevel" %% "cats-effect-kernel" % "3.0.0-RC2",
-    "com.softwaremill.diffx" %% "diffx-core" % "0.4.4"
+    "org.typelevel" %% "cats-effect-std" % "3.0.1",
+    "org.typelevel" %% "cats-effect-kernel" % "3.0.1",
+    "com.softwaremill.diffx" %% "diffx-core" % "0.3.30"
   ) ++ compilerPlugins
 )
 
@@ -45,8 +45,8 @@ val tests =
     .settings(
       commonSettings,
       libraryDependencies ++= List(
-        "org.typelevel" %% "cats-effect" % "3.0.0-RC2",
-        "com.softwaremill.diffx" %% "diffx-cats" % "0.4.4"
+        "org.typelevel" %% "cats-effect" % "3.0.1",
+        "com.softwaremill.diffx" %% "diffx-cats" % "0.3.30"
       )
     )
     .settings(name += "-tests")
@@ -58,7 +58,7 @@ val examples =
     .settings(
       commonSettings,
       libraryDependencies ++= List(
-        "org.typelevel" %% "cats-effect" % "3.0.0-RC2",
+        "org.typelevel" %% "cats-effect" % "3.0.1",
         //this won't work for now
         "org.tpolecat" %% "doobie-hikari" % "0.9.4",
         "org.postgresql" % "postgresql" % "42.2.19"
