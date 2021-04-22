@@ -60,7 +60,7 @@ val examples =
       libraryDependencies ++= List(
         "org.typelevel" %% "cats-effect" % "3.0.2",
         //this won't work for now
-        "org.tpolecat" %% "doobie-hikari" % "0.9.4",
+        "org.tpolecat" %% "doobie-hikari" % "0.13.0",
         "org.postgresql" % "postgresql" % "42.2.20"
       )
     )
