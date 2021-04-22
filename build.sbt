@@ -17,7 +17,7 @@ inThisBuild(
 val compilerPlugins = List(
   compilerPlugin("org.scalamacros" % "paradise" % "2.1.1").cross(CrossVersion.full),
   compilerPlugin("org.typelevel" % "kind-projector" % "0.11.3").cross(CrossVersion.full),
-  compilerPlugin("com.kubukoz" % "better-tostring" % "0.2.9").cross(CrossVersion.full),
+  compilerPlugin("com.kubukoz" % "better-tostring" % "0.2.10").cross(CrossVersion.full),
   compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 )
 
@@ -60,8 +60,8 @@ val examples =
       libraryDependencies ++= List(
         "org.typelevel" %% "cats-effect" % "3.0.2",
         //this won't work for now
-        "org.tpolecat" %% "doobie-hikari" % "0.13.0",
-        "org.postgresql" % "postgresql" % "42.2.19"
+        "org.tpolecat" %% "doobie-hikari" % "0.9.4",
+        "org.postgresql" % "postgresql" % "42.2.20"
       )
     )
     .settings(name += "-tests", skip in publish := true)
