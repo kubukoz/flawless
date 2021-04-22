@@ -61,7 +61,7 @@ val examples =
         "org.typelevel" %% "cats-effect" % "3.0.2",
         //this won't work for now
         "org.tpolecat" %% "doobie-hikari" % "0.9.4",
-        "org.postgresql" % "postgresql" % "42.2.19"
+        "org.postgresql" % "postgresql" % "42.2.20"
       )
     )
     .settings(name += "-tests", skip in publish := true)
