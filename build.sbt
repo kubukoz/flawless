@@ -17,7 +17,7 @@ inThisBuild(
 val compilerPlugins = List(
   compilerPlugin("org.scalamacros" % "paradise" % "2.1.1").cross(CrossVersion.full),
   compilerPlugin("org.typelevel" % "kind-projector" % "0.11.3").cross(CrossVersion.full),
-  compilerPlugin("com.kubukoz" % "better-tostring" % "0.2.10").cross(CrossVersion.full),
+  compilerPlugin("com.kubukoz" % "better-tostring" % "0.3.0").cross(CrossVersion.full),
   compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 )
 
