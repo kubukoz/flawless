@@ -16,8 +16,8 @@ inThisBuild(
 
 val compilerPlugins = List(
   compilerPlugin("org.scalamacros" % "paradise" % "2.1.1").cross(CrossVersion.full),
-  compilerPlugin("org.typelevel" % "kind-projector" % "0.11.3").cross(CrossVersion.full),
-  compilerPlugin("com.kubukoz" % "better-tostring" % "0.2.10").cross(CrossVersion.full),
+  compilerPlugin("org.typelevel" % "kind-projector" % "0.12.0").cross(CrossVersion.full),
+  compilerPlugin("com.kubukoz" % "better-tostring" % "0.3.1").cross(CrossVersion.full),
   compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 )
 
@@ -26,13 +26,13 @@ val commonSettings = Seq(
   name := "flawless",
   scalacOptions -= "-Xfatal-warnings",
   libraryDependencies ++= List(
-    "co.fs2" %% "fs2-core" % "3.0.1",
-    "org.typelevel" %% "cats-tagless-macros" % "0.13.0",
-    "org.typelevel" %% "cats-mtl" % "1.1.3",
+    "co.fs2" %% "fs2-core" % "3.0.2",
+    "org.typelevel" %% "cats-tagless-macros" % "0.14.0",
+    "org.typelevel" %% "cats-mtl" % "1.2.1",
     "com.github.julien-truffaut" %% "monocle" % "2.0.3",
-    "org.typelevel" %% "cats-effect-std" % "3.1.0",
-    "org.typelevel" %% "cats-effect-kernel" % "3.1.0",
-    "com.softwaremill.diffx" %% "diffx-core" % "0.4.5"
+    "org.typelevel" %% "cats-effect-std" % "3.1.1",
+    "org.typelevel" %% "cats-effect-kernel" % "3.1.1",
+    "com.softwaremill.diffx" %% "diffx-core" % "0.3.30"
   ) ++ compilerPlugins
 )
 
@@ -45,8 +45,8 @@ val tests =
     .settings(
       commonSettings,
       libraryDependencies ++= List(
-        "org.typelevel" %% "cats-effect" % "3.1.0",
-        "com.softwaremill.diffx" %% "diffx-cats" % "0.4.5"
+        "org.typelevel" %% "cats-effect" % "3.1.1",
+        "com.softwaremill.diffx" %% "diffx-cats" % "0.3.30"
       )
     )
     .settings(name += "-tests")
@@ -58,7 +58,7 @@ val examples =
     .settings(
       commonSettings,
       libraryDependencies ++= List(
-        "org.typelevel" %% "cats-effect" % "3.1.0",
+        "org.typelevel" %% "cats-effect" % "3.1.1",
         //this won't work for now
         "org.tpolecat" %% "doobie-hikari" % "0.9.4",
         "org.postgresql" % "postgresql" % "42.2.20"
