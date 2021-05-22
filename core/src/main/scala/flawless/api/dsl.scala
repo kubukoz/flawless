@@ -10,7 +10,6 @@ import flawless.PredicateT
 import cats.kernel.Eq
 import flawless.Predicate
 import cats.Functor
-import flawless.{Suite => _, _}
 import cats.effect.kernel.Ref
 import cats.FlatMap
 

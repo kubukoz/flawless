@@ -22,6 +22,9 @@ import cats.FlatMap
 import cats.Monad
 import cats.effect.kernel.Unique
 import cats.MonadThrow
+import cats.Functor
+import cats.Apply
+import scala.annotation.nowarn
 
 @finalAlg
 trait Interpreter[F[_]] {
@@ -43,7 +46,7 @@ object Interpreter {
 
         val exec: F[Test[NoEffect]] = test.result match {
           //this is a GADT skolem - you think I'd know what that means by now...
-          case eval: TestRun.Eval[f] => eval.effect.handleError(Assertion.thrown(_)).map(finish)
+          case eval: TestRun.Eval[f] => (eval.effect.handleError(Assertion.thrown(_)): F[Assertion]).map(finish)
           case TestRun.Pure(result)  => finish(result).pure[F]
           case TestRun.Lazy(e)       =>
             finish {
@@ -87,10 +90,18 @@ object Interpreter {
 
             val suiteCount = s.suites.length
 
-            (reporter.splitParent(parentId, suiteCount): f[NonEmptyList[reporter.Identifier]])
+            // Hack for Suite.sequence - trust me, these functions never get called
+            @nowarn("msg=dead code following this construct")
+            implicit val applyNothing: Apply[NoEffect] = new Apply[NoEffect] {
+              def map[A, B](fa: NoEffect[A])(f: A => B): NoEffect[B] = fa
+              def ap[A, B](fa: NoEffect[A => B])(fb: NoEffect[A]): NoEffect[B] = fa
+            }
+
+            reporter
+              .splitParent(parentId, suiteCount)
               .map((idents: NonEmptyList[reporter.Identifier]) => s.suites.zipWith(idents)((_, _)))
               .flatMap(interpretSuites)
-              .map(Suite.sequence[f](_))
+              .map(Suite.sequence(_))
           case o: One[f]       => interpretSuite(reporter)(parentId)(o)
           case s: Suspend[f]   => s.suite.flatMap(interpretOne(parentId))
           case r: RResource[f] => r.resuite.use(interpretOne(parentId))(r.monadCancel)

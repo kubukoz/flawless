@@ -15,16 +15,16 @@ inThisBuild(
 )
 
 val compilerPlugins = List(
-  compilerPlugin("org.scalamacros" % "paradise" % "2.1.1").cross(CrossVersion.full),
   compilerPlugin("org.typelevel" % "kind-projector" % "0.13.0").cross(CrossVersion.full),
-  compilerPlugin("com.kubukoz" % "better-tostring" % "0.3.1").cross(CrossVersion.full),
+  compilerPlugin("com.kubukoz" % "better-tostring" % "0.3.2").cross(CrossVersion.full),
   compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 )
 
 val commonSettings = Seq(
-  scalaVersion := "2.12.11",
+  scalaVersion := "2.13.5",
   name := "flawless",
   scalacOptions -= "-Xfatal-warnings",
+  scalacOptions += "-Ymacro-annotations",
   libraryDependencies ++= List(
     "co.fs2" %% "fs2-core" % "3.0.2",
     "org.typelevel" %% "cats-tagless-macros" % "0.14.0",
@@ -36,7 +36,7 @@ val commonSettings = Seq(
   ) ++ compilerPlugins
 )
 
-val noPublish = Seq(skip in publish := true)
+val noPublish = Seq((publish / skip) := true)
 
 val core = project.settings(commonSettings).settings(name += "-core")
 
@@ -60,11 +60,11 @@ val examples =
       libraryDependencies ++= List(
         "org.typelevel" %% "cats-effect" % "3.1.1",
         //this won't work for now
-        "org.tpolecat" %% "doobie-hikari" % "0.9.4",
+        "org.tpolecat" %% "doobie-hikari" % "1.0.0-M2",
         "org.postgresql" % "postgresql" % "42.2.20"
       )
     )
-    .settings(name += "-tests", skip in publish := true)
+    .settings(name += "-tests", (publish / skip) := true)
     .settings(noPublish)
     .dependsOn(core)
 
