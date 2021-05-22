@@ -22,7 +22,7 @@ val compilerPlugins = List(
 )
 
 val commonSettings = Seq(
-  scalaVersion := "2.12.11",
+  scalaVersion := "2.12.13",
   name := "flawless",
   scalacOptions -= "-Xfatal-warnings",
   libraryDependencies ++= List(
