@@ -91,11 +91,12 @@ object Interpreter {
             val suiteCount = s.suites.length
 
             // Hack for Suite.sequence - trust me, these functions never get called
-            @nowarn("msg=dead code following this construct")
-            implicit val applyNothing: Apply[NoEffect] = new Apply[NoEffect] {
-              def map[A, B](fa: NoEffect[A])(f: A => B): NoEffect[B] = fa
-              def ap[A, B](fa: NoEffect[A => B])(fb: NoEffect[A]): NoEffect[B] = fa
-            }
+
+            implicit val applyNothing: Apply[NoEffect] =
+              new Apply[NoEffect] {
+                def map[A, B](fa: NoEffect[A])(f: A => B): NoEffect[B] = fa
+                def ap[A, B](fa: NoEffect[A => B])(fb: NoEffect[A]): NoEffect[B] = fa
+              }
 
             reporter
               .splitParent(parentId, suiteCount)
