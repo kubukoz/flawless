@@ -2,6 +2,7 @@ package flawless.data
 
 import cats.data.NonEmptyChain
 import cats.implicits._
+import cats.catsInstancesForId
 import cats.Applicative
 import cats.Id
 import cats.NonEmptyParallel
@@ -297,6 +298,6 @@ object Assert {
     def tell(l: A): F[Unit] = ref.update(_ |+| l)
   }
 
-  def functorTellInstance[F[_]: Tell[*[_], Option[Assertion]]]: Assert[F] =
+  def functorTellInstance[F[_]](implicit F: Tell[F, Option[Assertion]]): Assert[F] =
     assertion => Tell[F, Option[Assertion]].tell(assertion.some)
 }

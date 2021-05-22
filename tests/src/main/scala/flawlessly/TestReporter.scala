@@ -39,7 +39,7 @@ final class TestReporter[F[_]: MonadCancelThrow] {
   implicit val wcParallel: Parallel[WC] = Parallel.identity
 
   val reporter: Reporter.Aux[WC, Int] = {
-    def make[M[_]: Stateful[*[_], Int]: Monad: Tell[*[_], S[LogEvent]], S[_]: Alternative]: Reporter.Aux[M, Int] =
+    def make[M[_]: Monad, S[_]: Alternative](implicit S: Stateful[M, Int], T: Tell[M, S[LogEvent]]): Reporter.Aux[M, Int] =
       new Reporter[M] {
         type Identifier = Int
         val root: Int = 0

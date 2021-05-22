@@ -13,20 +13,18 @@ import cats.effect.std.Console
 import cats.implicits._
 import cats.kernel.Eq
 import cats.mtl.Stateful
-import cats.tagless.finalAlg
 import flawless.NoEffect
 import flawless.data.Assertion
 import flawless.data.Suite
 import flawless.data.Test
 import flawless.data.TestRun
 import flawless.util.ChainUtils._
-import monocle.macros.syntax.lens._
+// import monocle.macros.syntax.lens._
 
 import scala.util.control.NonFatal
 
 import Interpreter.InterpretOne
 
-@finalAlg
 trait Interpreter[F[_]] {
 
   /** Interprets the test structure to the underlying effect. This is where all the actual execution happens.
@@ -35,6 +33,7 @@ trait Interpreter[F[_]] {
 }
 
 object Interpreter {
+  def apply[F[_]](implicit F: Interpreter[F]): Interpreter[F] = F
   //A type alias for an action that interprets a single instance of Algebra (e.g. suite or test)
   type InterpretOne[Algebra[_[_]], F[_]] = Algebra[F] => F[Algebra[NoEffect]]
 
@@ -115,7 +114,6 @@ object Interpreter {
 
 }
 
-@finalAlg
 trait Reporter[F[_]] {
   type Identifier
   def root: Identifier
@@ -126,6 +124,8 @@ trait Reporter[F[_]] {
 }
 
 object Reporter {
+  def apply[F[_]](implicit F: Reporter[F]): Reporter[F] = F
+
   type Aux[F[_], Ident] = Reporter[F] { type Identifier = Ident }
 
   sealed trait Event[Identifier] extends Product with Serializable
@@ -196,14 +196,15 @@ object Reporter {
     def MState[F[_]](implicit F: MState[F]): MState[F] = F
 
     def replace[F[_]: MState](toRemove: Unique.Token, cells: NonEmptyList[Cell]): F[Unit] =
-      MState[F].modify(
+      /* MState[F].modify(
         _.lens(_.cells)
           .modify(
             flatReplaceFirst { case Cell(`toRemove`, Status.Pending) =>
               Chain.fromSeq(cells.toList)
             }
           )
-      )
+      ) */
+      ???
 
     def markRunning[F[_]: MState](id: Unique.Token): F[Unit] =
       setStatus(id, Status.Running)
@@ -214,13 +215,13 @@ object Reporter {
       setStatus(id, newStatus)
     }
 
-    def setStatus[F[_]: MState](id: Unique.Token, newStatus: Status): F[Unit] = MState[F].modify {
+    def setStatus[F[_]: MState](id: Unique.Token, newStatus: Status): F[Unit] = ??? /* MState[F].modify {
       _.lens(_.cells).modify {
         flatReplaceFirst {
           case cell if cell.id === id => Chain.one(cell.copy(status = newStatus))
         }
       }
-    }
+    } */
 
     def show[F[_]: MState: FlatMap: Console]: F[Unit] = {
       val clear = "\u001b[2J\u001b[H"

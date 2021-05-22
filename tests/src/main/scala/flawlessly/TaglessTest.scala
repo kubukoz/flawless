@@ -2,7 +2,6 @@ package flawlessly
 
 import flawless._
 import flawless.dsl._
-import cats.tagless.finalAlg
 import cats.implicits._
 import cats.data.State
 import cats.effect.kernel.Ref
@@ -10,13 +9,13 @@ import cats.Functor
 import cats.FlatMap
 import cats.Monad
 
-@finalAlg
 trait MyAlg[F[_]] {
   def reset: F[Unit]
   def hello: F[Int]
 }
 
 object MyAlg {
+  def apply[F[_]](implicit F: MyAlg[F]): MyAlg[F] = F
 
   def refInstance[F[_]: Ref.Make: Functor]: F[MyAlg[F]] = Ref[F].of(0).map { ref =>
     new MyAlg[F] {

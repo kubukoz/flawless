@@ -1,17 +1,17 @@
 package flawless.util
 
-import scala.annotation.tailrec
 import cats.data.Chain
-import cats.data.Chain.==:
+
+import scala.annotation.tailrec
 
 object ChainUtils {
 
   def flatReplaceFirst[A](f: PartialFunction[A, Chain[A]]): Chain[A] => Chain[A] = {
 
     @tailrec
-    def go(list: Chain[A], memory: Chain[A]): Chain[A] = list match {
-      case Chain.nil     => memory
-      case head ==: tail =>
+    def go(list: Chain[A], memory: Chain[A]): Chain[A] = list.uncons match {
+      case None               => memory
+      case Some((head, tail)) =>
         f.lift(head) match {
           case Some(elems) => memory ++ elems ++ tail
           case None        => go(tail, memory append head)

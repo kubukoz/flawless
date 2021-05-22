@@ -3,7 +3,7 @@ package flawless.api
 import flawless.data._
 import cats.data._
 import cats.implicits._
-import com.softwaremill.diffx.Diff
+// import com.softwaremill.diffx.Diff
 import cats.Show
 import cats.Eval
 import flawless.PredicateT
@@ -12,6 +12,7 @@ import flawless.Predicate
 import cats.Functor
 import cats.effect.kernel.Ref
 import cats.FlatMap
+import cats.mtl.Tell
 
 trait AllDsl {
 
@@ -40,7 +41,7 @@ trait AllDsl {
   type AssertionState[A] = Writer[Option[Assertion], A]
 
   def pureTestMonadic(name: String)(f: Assert[AssertionState] => AssertionState[Unit]): NonEmptyList[Test[Nothing]] = {
-    val assertInstance = Assert.functorTellInstance[AssertionState]
+    val assertInstance = Assert.functorTellInstance[AssertionState](Tell.tellForWriterT)
 
     pureTest(name) {
       f(assertInstance).written.getOrElse(Assertion.failed("No assertions were made!"))
@@ -70,8 +71,8 @@ trait AllDsl {
   def ensureEqualEq[A: Eq: Show](actual: A, expected: A): Assertion =
     ensure(actual, flawless.predicates.equalToEq(expected))
 
-  def ensureEqual[A: Diff: Show](actual: A, expected: A): Assertion =
-    ensure(actual, flawless.predicates.equalTo(expected))
+  // def ensureEqual[A: Diff: Show](actual: A, expected: A): Assertion =
+  //   ensure(actual, flawless.predicates.equalTo(expected))
 
   def assertion(cond: Boolean, ifFalse: String): Assertion = ensure(cond, flawless.predicates.isTrue(ifFalse))
 }

@@ -2,8 +2,8 @@ package flawless.api
 
 import flawless.data._
 import cats.implicits._
-import com.softwaremill.diffx.Diff
-import com.softwaremill.diffx.DiffResult
+// import com.softwaremill.diffx.Diff
+// import com.softwaremill.diffx.DiffResult
 import cats.Show
 import cats.Order
 import flawless.Predicate
@@ -16,19 +16,19 @@ trait AllPredicates {
     if (a > another) Assertion.successful else Assertion.failed(show"$a was not greater than $another")
   }
 
-  def equalTo[T: Diff: Show](expected: T): Predicate[T] = Predicate {
-    implicit val showDiff: Show[DiffResult] = _.show
+  // def equalTo[T: Diff: Show](expected: T): Predicate[T] = Predicate {
+  //   implicit val showDiff: Show[DiffResult] = _.show
 
-    actual =>
-      Diff[T].apply(actual, expected) match {
-        case diff if diff.isIdentical => Assertion.successful
-        case diff                     =>
-          Assertion
-            .failed(
-              show"$actual (actual) was not equal to $expected (expected). Diff: ${Console.RESET}$diff"
-            ) //this reset is a hacky hack, but works!
-      }
-  }
+  //   actual =>
+  //     Diff[T].apply(actual, expected) match {
+  //       case diff if diff.isIdentical => Assertion.successful
+  //       case diff                     =>
+  //         Assertion
+  //           .failed(
+  //             show"$actual (actual) was not equal to $expected (expected). Diff: ${Console.RESET}$diff"
+  //           ) //this reset is a hacky hack, but works!
+  //     }
+  // }
 
   def equalToEq[T: Eq: Show](expected: T): Predicate[T] = Predicate {
     case actual if actual === expected => Assertion.successful
