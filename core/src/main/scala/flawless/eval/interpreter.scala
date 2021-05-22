@@ -1,30 +1,30 @@
 package flawless.eval
 
-import cats.implicits._
-import flawless.data.Test
-import flawless.data.Assertion
-import flawless.data.TestRun
-import cats.tagless.finalAlg
-import cats.effect.std.Console
-import Interpreter.InterpretOne
-import flawless.data.Suite
-import flawless.NoEffect
-import cats.data.NonEmptyList
-import cats.mtl.Stateful
-import cats.kernel.Eq
 import cats.Applicative
-import cats.effect.Ref
-import scala.util.control.NonFatal
-import monocle.macros.syntax.lens._
-import cats.data.Chain
-import flawless.util.ChainUtils._
+import cats.Apply
 import cats.FlatMap
 import cats.Monad
-import cats.effect.kernel.Unique
 import cats.MonadThrow
-import cats.Functor
-import cats.Apply
-import scala.annotation.nowarn
+import cats.data.Chain
+import cats.data.NonEmptyList
+import cats.effect.Ref
+import cats.effect.kernel.Unique
+import cats.effect.std.Console
+import cats.implicits._
+import cats.kernel.Eq
+import cats.mtl.Stateful
+import cats.tagless.finalAlg
+import flawless.NoEffect
+import flawless.data.Assertion
+import flawless.data.Suite
+import flawless.data.Test
+import flawless.data.TestRun
+import flawless.util.ChainUtils._
+import monocle.macros.syntax.lens._
+
+import scala.util.control.NonFatal
+
+import Interpreter.InterpretOne
 
 @finalAlg
 trait Interpreter[F[_]] {
