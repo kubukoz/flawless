@@ -32,7 +32,7 @@ val commonSettings = Seq(
     "com.github.julien-truffaut" %% "monocle" % "2.0.3",
     "org.typelevel" %% "cats-effect-std" % "3.1.1",
     "org.typelevel" %% "cats-effect-kernel" % "3.1.1",
-    "com.softwaremill.diffx" %% "diffx-core" % "0.3.30"
+    "com.softwaremill.diffx" %% "diffx-core" % "0.5.1"
   ) ++ compilerPlugins
 )
 
@@ -46,7 +46,7 @@ val tests =
       commonSettings,
       libraryDependencies ++= List(
         "org.typelevel" %% "cats-effect" % "3.1.1",
-        "com.softwaremill.diffx" %% "diffx-cats" % "0.3.30"
+        "com.softwaremill.diffx" %% "diffx-cats" % "0.5.1"
       )
     )
     .settings(name += "-tests")
