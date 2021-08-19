@@ -1,7 +1,6 @@
 package flawless.examples
 
 import cats.effect.IO
-
 import scala.util.Random
 import cats.implicits._
 import flawless.dsl._

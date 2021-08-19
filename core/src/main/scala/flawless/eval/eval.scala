@@ -7,7 +7,6 @@ import cats.implicits._
 
 package object eval {
   import flawless.data.Assertion.Result.Failed
-
   import cats.Applicative
 
   //todo: show names of suites
