@@ -21,9 +21,7 @@ import flawless.data.Test
 import flawless.data.TestRun
 import flawless.util.ChainUtils._
 import monocle.macros.syntax.lens._
-
 import scala.util.control.NonFatal
-
 import Interpreter.InterpretOne
 
 @finalAlg
