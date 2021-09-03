@@ -1,4 +1,5 @@
 import cats.effect.ExitCode
+
 import cats.implicits._
 import cats.effect.std.Console
 import flawless.data.Assertion
