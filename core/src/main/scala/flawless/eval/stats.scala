@@ -58,10 +58,14 @@ object RunStats {
 
   /** For each element `a` in `fa`, partition all the selected elements found in `a` by the given predicate.
     *
-    * @param fa the root container (always the same on the same tree)
-    * @param select the way to select all the elements you want to end up in the list
-    * @param p the predicate that checks the elements
-    * @return (matching, nonmatching)
+    * @param fa
+    *   the root container (always the same on the same tree)
+    * @param select
+    *   the way to select all the elements you want to end up in the list
+    * @param p
+    *   the predicate that checks the elements
+    * @return
+    *   (matching, nonmatching)
     */
   private def partitionAll[F[_]: Foldable, Root, Selected](
     fa: F[Root],
@@ -74,8 +78,8 @@ object RunStats {
 
   final class GetStatsPartiallyApplied[F[_]: Foldable] private[RunStats] (suites: F[Suite[Id]]) {
 
-    /** Get the stats for the selected metric (as defined by the `select` traversal) of all the suites in `fa`.
-      * `traversal` defines how to go from the selected metric to the assertions.
+    /** Get the stats for the selected metric (as defined by the `select` traversal) of all the suites in `fa`. `traversal` defines how to
+      * go from the selected metric to the assertions.
       */
     def of[Selected](select: Fold[Suite[Id], Selected], traversal: Fold[Selected, Assertion.Result]): RunStats.Stat = {
       val (succeeded, failed) =
