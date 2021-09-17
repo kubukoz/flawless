@@ -109,8 +109,8 @@ object Assertion {
   implicit val eq: Eq[Assertion] = Eq.by(_.results)
 
   implicit val show: Show[Assertion] = {
-    case One(result)     => show"Assertion.One(${result})"
-    case All(assertions) => show"Assertion.All(${assertions})"
+    case One(result)     => show"Assertion.One($result)"
+    case All(assertions) => show"Assertion.All($assertions)"
   }
 
 }
@@ -154,13 +154,12 @@ object Traversal {
   def parallel[F[_]: NonEmptyParallel]: Traversal[F] = Parallel(NonEmptyParallel[F])
 }
 
-/** A value of this type is a non-empty sequence of test suites. Each suite must have a name.
-  * Suites can be composed to run sequentially or in parallel to each other. Effects and resources can also be lifted to a Suite.
+/** A value of this type is a non-empty sequence of test suites. Each suite must have a name. Suites can be composed to run sequentially or
+  * in parallel to each other. Effects and resources can also be lifted to a Suite.
   */
 sealed trait Suite[+F[_]] extends Product with Serializable {
 
-  /** Rename each suite in this value using the given function.
-    * todo: this should be an aspect
+  /** Rename each suite in this value using the given function. todo: this should be an aspect
     */
   def renameEach[F2[a] >: F[a]: FlatMap](modName: String => F2[String]): Suite[F2] =
     Suite.renameEach(modName).apply(this)

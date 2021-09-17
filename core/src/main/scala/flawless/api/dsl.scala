@@ -23,8 +23,8 @@ trait AllDsl {
   def test[F[_]](name: String)(assertions: F[Assertion]): NonEmptyList[Test[F]] =
     NonEmptyList.one(Test(name, TestRun.Eval(assertions)))
 
-  /** Provides access to assertions in a monadic fashion.
-    * If no assertions are added, the test completes with a single failed assertion (making it impossible to have a green test without assertions).
+  /** Provides access to assertions in a monadic fashion. If no assertions are added, the test completes with a single failed assertion
+    * (making it impossible to have a green test without assertions).
     */
   def testMonadic[F[_]: Ref.Make: FlatMap](name: String)(assertions: Assert[F] => F[Unit]): NonEmptyList[Test[F]] =
     test[F](name) {
