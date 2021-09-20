@@ -30,9 +30,9 @@ val commonSettings = Seq(
     "org.typelevel" %% "cats-tagless-macros" % "0.14.0",
     "org.typelevel" %% "cats-mtl" % "1.2.1",
     "com.github.julien-truffaut" %% "monocle" % "2.0.3",
-    "org.typelevel" %% "cats-effect-std" % "3.1.1",
-    "org.typelevel" %% "cats-effect-kernel" % "3.1.1",
-    "com.softwaremill.diffx" %% "diffx-core" % "0.5.6"
+    "org.typelevel" %% "cats-effect-std" % "3.2.9",
+    "org.typelevel" %% "cats-effect-kernel" % "3.2.9",
+    "com.softwaremill.diffx" %% "diffx-core" % "0.3.30"
   ) ++ compilerPlugins
 )
 
@@ -45,8 +45,8 @@ val tests =
     .settings(
       commonSettings,
       libraryDependencies ++= List(
-        "org.typelevel" %% "cats-effect" % "3.1.1",
-        "com.softwaremill.diffx" %% "diffx-cats" % "0.5.6"
+        "org.typelevel" %% "cats-effect" % "3.2.9",
+        "com.softwaremill.diffx" %% "diffx-cats" % "0.3.30"
       )
     )
     .settings(name += "-tests")
@@ -58,7 +58,7 @@ val examples =
     .settings(
       commonSettings,
       libraryDependencies ++= List(
-        "org.typelevel" %% "cats-effect" % "3.1.1",
+        "org.typelevel" %% "cats-effect" % "3.2.9",
         //this won't work for now
         "org.tpolecat" %% "doobie-hikari" % "1.0.0-M4",
         "org.postgresql" % "postgresql" % "42.2.20"
