@@ -35,7 +35,7 @@ final class TestReporter[F[_]: MonadCancelThrow] {
   type WC[A] = ReaderWriterStateT[F, Unit, Chain[LogEvent], Int, A]
 
   implicit val wcMonadCancel: MonadCancel[WC, Throwable] = MonadCancel.monadCancelForReaderWriterStateT
-  //The instance shall not be used for parallelism! It's pretty much just a marker
+  // The instance shall not be used for parallelism! It's pretty much just a marker
   implicit val wcParallel: Parallel[WC] = Parallel.identity
 
   val reporter: Reporter.Aux[WC, Int] = {
@@ -65,7 +65,7 @@ final class TestReporter[F[_]: MonadCancelThrow] {
   def reported[G[_]: Foldable](expectedWritten: G[LogEvent]): PredicateT[F, Suite[WC]] =
     reportedWith[G](equalTo(expectedWritten.toList))
 
-  //todo naming
+  // todo naming
   def reportedWith[G[_]: Foldable](writtenPredicate: Predicate[List[LogEvent]]): PredicateT[F, Suite[WC]] =
     select[Suite[WC]](interpreter.interpret(reporter)(_).written.runA((), 0).map(_.toList))(
       writtenPredicate.liftM[F]

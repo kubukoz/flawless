@@ -32,7 +32,7 @@ object RunStats {
     )
   }
 
-  //Getters/folds for suite/test/assertion results
+  // Getters/folds for suite/test/assertion results
   private object optics {
 
     private val suiteTests: Getter[Suite[Id], NonEmptyList[Test[Id]]] =

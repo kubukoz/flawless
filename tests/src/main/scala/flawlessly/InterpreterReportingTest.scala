@@ -32,10 +32,10 @@ object InterpreterReportingTest {
         SuiteFinished("suite 1", id, succeeded = true)
       ).map(LogEvent.Report(_))
 
-    //todo: why are these instances not visible?
+    // todo: why are these instances not visible?
     def simpleResource(suite: Suite[WC]): Suite[WC] = Suite.resource(suite.pure[Resource[WC, *]])(wcMonadCancel)
 
-    //todo: these would be good property tests
+    // todo: these would be good property tests
     suite("InterpreterReportingTest") {
       tests(
         test("single suite") {

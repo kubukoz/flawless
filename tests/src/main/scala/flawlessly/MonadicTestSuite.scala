@@ -21,7 +21,7 @@ object MonadicTestSuite {
 
     tests(
       test("monadic tests fail when no assertions are given") {
-        //todo: tests shouldn't return lists anymore... I know, free monoid :(
+        // todo: tests shouldn't return lists anymore... I know, free monoid :(
         val NonEmptyList(theTest, _) = testMonadic[F]("demo")(_ => Applicative[F].unit)
 
         ensure(theTest, failedDueToAssertions)

@@ -39,10 +39,10 @@ object ExampleTests extends IOApp with TestApp {
     Suite
       .resource[IO] {
         xa.map { transactor =>
-          new DoobieQueryTests(transactor).runSuite.parCombineN(5) //5 suites per allocation
+          new DoobieQueryTests(transactor).runSuite.parCombineN(5) // 5 suites per allocation
         }
       }
-      .parCombineN(2) //2 allocations
+      .parCombineN(2) // 2 allocations
   }
 
   override def run(args: List[String]): IO[ExitCode] =
