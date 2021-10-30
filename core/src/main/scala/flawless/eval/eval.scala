@@ -10,7 +10,7 @@ package object eval {
 
   import cats.Applicative
 
-  //todo: show names of suites
+  // todo: show names of suites
   def toTerminalOutput(output: Output): (String, ExitCode) = {
     import scala.io.AnsiColor
 
@@ -96,7 +96,7 @@ package object eval {
 
   def loadArgs[F[_]: Applicative](args: List[String]): F[Settings] = {
     val _ = args
-    //todo actually read the args
+    // todo actually read the args
     Settings(visual = true).pure[F]
     // Settings(visual = false).pure[F]
     // Settings(visual = args.contains("visual")).pure[F]

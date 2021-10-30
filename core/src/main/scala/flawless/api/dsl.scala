@@ -54,7 +54,7 @@ trait AllDsl {
     NonEmptyList.one(Test(name, TestRun.Lazy(Eval.later(assertions))))
 
   object ensure {
-    //todo inconsistent with ensureM.apply
+    // todo inconsistent with ensureM.apply
     def apply[F[_], A](value: A, predicate: PredicateT[F, A]): F[Assertion] = predicate(value)
     def fun[F[_], A](value: A)(predicate: A => F[Assertion]): F[Assertion] = ensure(value, PredicateT(predicate))
   }
@@ -66,7 +66,7 @@ trait AllDsl {
       apply(value)(PredicateT[cats.Id, A](predicate))
   }
 
-  //todo naming
+  // todo naming
   def ensureEqualEq[A: Eq: Show](actual: A, expected: A): Assertion =
     ensure(actual, flawless.predicates.equalToEq(expected))
 

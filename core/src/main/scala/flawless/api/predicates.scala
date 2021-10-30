@@ -26,7 +26,7 @@ trait AllPredicates {
           Assertion
             .failed(
               show"$actual (actual) was not equal to $expected (expected). Diff: ${Console.RESET}$diff"
-            ) //this reset is a hacky hack, but works!
+            ) // this reset is a hacky hack, but works!
       }
   }
 
