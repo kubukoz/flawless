@@ -21,7 +21,7 @@ val compilerPlugins = List(
 )
 
 val commonSettings = Seq(
-  scalaVersion := "2.13.5",
+  scalaVersion := "2.13.7",
   name := "flawless",
   scalacOptions -= "-Xfatal-warnings",
   scalacOptions += "-Ymacro-annotations",
