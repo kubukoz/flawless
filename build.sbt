@@ -11,7 +11,7 @@ inThisBuild(
         url("https://kubukoz.com")
       )
     ),
-    Test / fork := true
+    fork := true
   )
 )
 
