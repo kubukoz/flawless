@@ -10,7 +10,8 @@ inThisBuild(
         "kubukoz@gmail.com",
         url("https://kubukoz.com")
       )
-    )
+    ),
+    Test / fork := true
   )
 )
 
