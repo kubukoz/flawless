@@ -62,5 +62,5 @@ object GetStatsTest extends SuiteClass[NoEffect] {
     )
   }
 
-  //todo property based tests - the total amount of each stat should be the sum of failed+succeeded
+  // todo property based tests - the total amount of each stat should be the sum of failed+succeeded
 }

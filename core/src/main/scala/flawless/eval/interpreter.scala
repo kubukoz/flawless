@@ -35,7 +35,7 @@ trait Interpreter[F[_]] {
 }
 
 object Interpreter {
-  //A type alias for an action that interprets a single instance of Algebra (e.g. suite or test)
+  // A type alias for an action that interprets a single instance of Algebra (e.g. suite or test)
   type InterpretOne[Algebra[_[_]], F[_]] = Algebra[F] => F[Algebra[NoEffect]]
 
   def defaultInterpreter[F[_]: MonadThrow]: Interpreter[F] =
@@ -45,7 +45,7 @@ object Interpreter {
         def finish(results: Assertion): Test[NoEffect] = Test(test.name, TestRun.Pure(results))
 
         val exec: F[Test[NoEffect]] = test.result match {
-          //this is a GADT skolem - you think I'd know what that means by now...
+          // this is a GADT skolem - you think I'd know what that means by now...
           case eval: TestRun.Eval[f] => (eval.effect.handleError(Assertion.thrown(_)): F[Assertion]).map(finish)
           case TestRun.Pure(result)  => finish(result).pure[F]
           case TestRun.Lazy(e)       =>
@@ -66,7 +66,7 @@ object Interpreter {
 
         reporter.publish(Reporter.Event.SuiteStarted(suite.name, id)) *>
           suite.tests.nonEmptyTraverse(interpretTest(reporter).apply(_)).map(finish).flatTap { suiteResult =>
-            //todo duplicated logic!!!!
+            // todo duplicated logic!!!!
             val isSuccessful =
               suiteResult
                 .tests
@@ -142,7 +142,7 @@ object Reporter {
 
   final case class SuiteHistory(cells: Chain[SuiteHistory.Cell]) {
 
-    //reference implementation, will be overridden for more performance (and possibly no fs2 dependency in eval)
+    // reference implementation, will be overridden for more performance (and possibly no fs2 dependency in eval)
     def stringify: String = {
       val failedSuites = cells.count(_.status === SuiteHistory.Status.Failed)
 

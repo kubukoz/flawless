@@ -226,10 +226,10 @@ object Suite {
   implicit def suiteSemigroup[F[_]: Apply]: Semigroup[Suite[F]] = _ zip _
 
   def renameEach[F[_]: FlatMap](modName: String => F[String]): Suite[F] => Suite[F] = {
-    //todo what about stack safety in the case of tests in Id?
+    // todo what about stack safety in the case of tests in Id?
     def go(self: Suite[F]): F[Suite[F]] = self match {
       case o: algebra.One[f] =>
-        //typing newName manually is needed due to GADT limitation
+        // typing newName manually is needed due to GADT limitation
         Functor[f].map(modName(o.name))(algebra.One[f](_: String, o.tests))
 
       case s: algebra.Sequence[f]  => s.traversal.traverse(s.suites)(go)
