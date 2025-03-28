@@ -24,7 +24,7 @@ import flawless.syntax._
 
 ## Design
 
-See [design doc](DESIGN.md) and [watch the talk](https://vimeo.com/368027707)!
+See [design doc](DESIGN.md) and [watch the talk](https://www.youtube.com/watch?v=v9nv3dfYfw4)!
 
 ## Adoption
 
