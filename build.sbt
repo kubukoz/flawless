@@ -27,7 +27,7 @@ val commonSettings = Seq(
   scalacOptions -= "-Xfatal-warnings",
   scalacOptions += "-Ymacro-annotations",
   libraryDependencies ++= List(
-    "co.fs2" %% "fs2-core" % "3.0.2",
+    "co.fs2" %% "fs2-core" % "3.4.0",
     "org.typelevel" %% "cats-tagless-macros" % "0.14.0",
     "org.typelevel" %% "cats-mtl" % "1.2.1",
     "com.github.julien-truffaut" %% "monocle" % "2.0.3",
